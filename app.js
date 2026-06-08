@@ -74,6 +74,7 @@ const els = {
   spreadsheetTextPanel: document.querySelector("#spreadsheetTextPanel"),
   spreadsheetTextOutput: document.querySelector("#spreadsheetTextOutput"),
   importSpreadsheet: document.querySelector("#importSpreadsheet"),
+  importGlobalSpreadsheet: document.querySelector("#importGlobalSpreadsheet"),
   exportRosterData: document.querySelector("#exportRosterData"),
   importRosterSpreadsheet: document.querySelector("#importRosterSpreadsheet"),
   clearRecords: document.querySelector("#clearRecords"),
@@ -3189,6 +3190,7 @@ function init() {
   els.showSpreadsheetText.addEventListener("click", showSpreadsheetText);
   els.copySpreadsheetText.addEventListener("click", copySpreadsheetText);
   els.importSpreadsheet.addEventListener("change", importSpreadsheet);
+  if (els.importGlobalSpreadsheet) els.importGlobalSpreadsheet.addEventListener("change", importSpreadsheet);
   if (els.exportRosterData) els.exportRosterData.addEventListener("click", exportSpreadsheet);
   if (els.importRosterSpreadsheet) els.importRosterSpreadsheet.addEventListener("change", importSpreadsheet);
   els.clearRecords.addEventListener("click", clearRecords);

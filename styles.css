@@ -73,6 +73,10 @@ button.danger {
   display: none;
 }
 
+.tab-import-action input {
+  display: none;
+}
+
 input {
   width: 100%;
   min-height: 38px;
@@ -123,12 +127,24 @@ input:focus {
 }
 
 .save-status {
+  display: grid;
+  gap: 2px;
   flex: 0 0 auto;
   border: 1px solid #cdd9e6;
-  border-radius: 999px;
-  padding: 8px 13px;
+  border-radius: 12px;
+  padding: 8px 12px;
   color: var(--muted);
   background: rgba(255, 255, 255, 0.72);
+}
+
+.save-status strong {
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.save-status span {
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .match-meta,
@@ -146,6 +162,8 @@ input:focus {
 
 .app-tabs {
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 18px;
 }
@@ -160,6 +178,24 @@ input:focus {
   border-color: var(--blue);
   color: #fff;
   background: var(--blue);
+}
+
+.tab-import-action {
+  display: inline-grid;
+  place-items: center;
+  min-height: 42px;
+  border: 1px solid #c8d8ca;
+  border-radius: 8px;
+  padding: 0 12px;
+  color: var(--green);
+  font-size: 13px;
+  font-weight: 900;
+  background: var(--green-soft);
+  cursor: pointer;
+}
+
+.tab-import-action:hover {
+  border-color: var(--green);
 }
 
 .match-meta {

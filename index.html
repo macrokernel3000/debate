@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>辯論比賽計分紀錄</title>
-    <link rel="stylesheet" href="styles.css?v=20260608-23" />
+    <link rel="stylesheet" href="styles.css?v=20260608-25" />
   </head>
   <body>
     <main class="app">
@@ -13,7 +13,10 @@
           <p class="eyebrow">小果仁思辨教育</p>
           <h1>辯論賽計分紀錄</h1>
         </div>
-        <div class="save-status" id="saveStatus">資料儲存在此瀏覽器</div>
+        <div class="save-status">
+          <strong id="saveStatus">資料儲存在此瀏覽器</strong>
+          <span>完成作業後請記得匯出資料。</span>
+        </div>
       </header>
 
       <nav class="app-tabs" aria-label="功能切換">
@@ -21,6 +24,10 @@
         <button class="tab-button" type="button" data-view="rosterView">賽事檢錄</button>
         <button class="tab-button" type="button" data-view="cycleView">循環計算器</button>
         <button class="tab-button" type="button" data-view="playerView">統計數據</button>
+        <label class="tab-import-action" title="匯入資料" aria-label="匯入資料">
+          <span>匯入資料</span>
+          <input id="importGlobalSpreadsheet" type="file" accept=".csv,text/csv" />
+        </label>
       </nav>
 
       <section id="scoreView" class="app-view">
@@ -210,13 +217,13 @@
       <section class="actions" aria-label="操作">
         <button class="primary" id="saveMatch" type="button">儲存本場</button>
         <button id="resetForm" type="button">清空輸入</button>
-        <button id="exportRecords" type="button">匯出全部報表</button>
-        <button id="exportSpreadsheet" type="button">匯出資料包</button>
-        <button id="showSpreadsheetText" type="button">顯示貼上用表格</button>
         <label class="import-action">
-          匯入資料包
+          匯入資料
           <input id="importSpreadsheet" type="file" accept=".csv,text/csv" />
         </label>
+        <button id="exportSpreadsheet" type="button">匯出資料</button>
+        <button id="exportRecords" type="button">列印全部報表</button>
+        <button id="showSpreadsheetText" type="button" title="貼上試算表後可匯入">顯示複製用表格</button>
         <button class="danger" id="clearRecords" type="button">刪除全部紀錄</button>
       </section>
 
@@ -271,9 +278,9 @@
               <textarea id="rosterPlayers" placeholder="王小明&#10;陳小華&#10;林小安"></textarea>
             </label>
             <button class="primary" id="saveRosterTeam" type="button">儲存／更新名單</button>
-            <button id="exportRosterData" type="button">匯出資料包</button>
+            <button id="exportRosterData" type="button">匯出資料</button>
             <label class="import-action">
-              匯入資料包
+              匯入資料
               <input id="importRosterSpreadsheet" type="file" accept=".csv,text/csv" />
             </label>
           </div>
@@ -501,6 +508,6 @@
     <datalist id="playerNameOptions"></datalist>
     <datalist id="teamNameOptions"></datalist>
 
-    <script src="app.js?v=20260608-23"></script>
+    <script src="app.js?v=20260608-25"></script>
   </body>
 </html>
