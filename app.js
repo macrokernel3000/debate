@@ -12,6 +12,13 @@ const MIN_SCORE = -10;
 const MAX_SCORE = 100;
 const PHOTO_MAX_SIZE = 1600;
 const PHOTO_QUALITY = 0.82;
+const CYCLE_RANK_RULES = {
+  matchWins: { label: "勝場數", direction: "desc" },
+  ballotWins: { label: "評分單張數", direction: "desc" },
+  argumentPoints: { label: "論點單張數", direction: "desc" },
+  speakerRankPoints: { label: "辯士排名加總", direction: "asc" },
+  totalScore: { label: "總分加總", direction: "desc" },
+};
 
 let currentBallotPhoto = null;
 
@@ -22,6 +29,9 @@ const els = {
   matchDate: document.querySelector("#matchDate"),
   matchJudge: document.querySelector("#matchJudge"),
   matchRecorder: document.querySelector("#matchRecorder"),
+  judgeNameOptions: document.querySelector("#judgeNameOptions"),
+  recorderNameOptions: document.querySelector("#recorderNameOptions"),
+  playerNameOptions: document.querySelector("#playerNameOptions"),
   ballotPhotoInput: document.querySelector("#ballotPhotoInput"),
   ballotPhotoStatus: document.querySelector("#ballotPhotoStatus"),
   ballotPhotoPreview: document.querySelector("#ballotPhotoPreview"),
@@ -33,6 +43,8 @@ const els = {
   negativeTeam: document.querySelector("#negativeTeam"),
   affirmativeArgument: document.querySelector("#affirmativeArgument"),
   negativeArgument: document.querySelector("#negativeArgument"),
+  affirmativeClosing: document.querySelector("#affirmativeClosing"),
+  negativeClosing: document.querySelector("#negativeClosing"),
   affirmativeRows: document.querySelector("#affirmativeRows"),
   negativeRows: document.querySelector("#negativeRows"),
   affirmativeTotal: document.querySelector("#affirmativeTotal"),
@@ -43,9 +55,14 @@ const els = {
   seasonRankings: document.querySelector("#seasonRankings"),
   saveStatus: document.querySelector("#saveStatus"),
   saveMatch: document.querySelector("#saveMatch"),
+  swapSides: document.querySelector("#swapSides"),
   resetForm: document.querySelector("#resetForm"),
   exportRecords: document.querySelector("#exportRecords"),
   exportSpreadsheet: document.querySelector("#exportSpreadsheet"),
+  showSpreadsheetText: document.querySelector("#showSpreadsheetText"),
+  copySpreadsheetText: document.querySelector("#copySpreadsheetText"),
+  spreadsheetTextPanel: document.querySelector("#spreadsheetTextPanel"),
+  spreadsheetTextOutput: document.querySelector("#spreadsheetTextOutput"),
   importSpreadsheet: document.querySelector("#importSpreadsheet"),
   clearRecords: document.querySelector("#clearRecords"),
   matchSummaryList: document.querySelector("#matchSummaryList"),
@@ -58,6 +75,7 @@ const els = {
   cycleType: document.querySelector("#cycleType"),
   cycleCompetition: document.querySelector("#cycleCompetition"),
   cycleMatchSelects: document.querySelectorAll(".cycle-match-select"),
+  cycleRankSelects: document.querySelectorAll(".cycle-rank-select"),
   cycleStatus: document.querySelector("#cycleStatus"),
   cycleResult: document.querySelector("#cycleResult"),
 };
@@ -70,7 +88,7 @@ function formatNumber(value) {
 function numericValue(input) {
   const value = Number.parseFloat(input.value);
   if (!Number.isFinite(value)) return 0;
-  return clampScore(value);
+  return clampScore(value, input);
 }
 
 function boundedIntegerValue(input, fallback, min, max) {
@@ -79,18 +97,35 @@ function boundedIntegerValue(input, fallback, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
-function clampScore(value) {
-  return Math.min(MAX_SCORE, Math.max(MIN_SCORE, value));
+function clampScore(value, input) {
+  const min = input?.hasAttribute("min") ? Number.parseFloat(input.min) : MIN_SCORE;
+  const max = input?.hasAttribute("max") ? Number.parseFloat(input.max) : MAX_SCORE;
+  return Math.min(max, Math.max(min, value));
 }
 
 function normalizeScoreInput(input) {
   if (input.type !== "number" || !input.hasAttribute("max")) return;
   if (input.value === "") return;
 
-  const clamped = clampScore(Number.parseFloat(input.value));
+  const clamped = clampScore(Number.parseFloat(input.value), input);
   if (String(clamped) !== input.value) {
     input.value = String(clamped);
   }
+}
+
+function prepareNumericInput(input) {
+  if (input.type !== "number") return;
+  input.autocomplete = "off";
+  input.lang = "en";
+  input.addEventListener("focus", () => input.select());
+  input.addEventListener("keydown", (event) => {
+    if (event.metaKey || event.ctrlKey || event.altKey || event.isComposing) return;
+    const allowedKeys = ["Backspace", "Delete", "Tab", "Enter", "Escape", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"];
+    if (allowedKeys.includes(event.key)) return;
+    const allowsNegative = Number.parseFloat(input.min) < 0;
+    const isAllowedNumber = /^[0-9.]$/.test(event.key) || (allowsNegative && event.key === "-");
+    if (!isAllowedNumber) event.preventDefault();
+  });
 }
 
 function normalizeIntegerInput(input) {
@@ -130,6 +165,7 @@ function createRows() {
       row.dataset.side = side;
       row.dataset.index = String(i);
       row.querySelectorAll("input").forEach((input) => {
+        prepareNumericInput(input);
         input.addEventListener("input", () => {
           normalizeScoreInput(input);
           calculate();
@@ -154,7 +190,7 @@ function getPlayers(side) {
 
 function getSideTotal(side) {
   const playerTotal = getPlayers(side).reduce((sum, player) => sum + player.total, 0);
-  return playerTotal + numericValue(els[`${side}Argument`]);
+  return playerTotal + numericValue(els[`${side}Argument`]) + numericValue(els[`${side}Closing`]);
 }
 
 function getBestPlayers(players, teams) {
@@ -202,10 +238,23 @@ function renderRankingList(list, players, formatter) {
   });
 }
 
-function determineWinner(affirmativeTotal, negativeTotal) {
+function determineWinner(affirmativeTotal, negativeTotal, affirmativeArgument = 0, negativeArgument = 0) {
   if (affirmativeTotal === 0 && negativeTotal === 0) return "尚未判定";
-  if (affirmativeTotal === negativeTotal) return "平手";
+  if (affirmativeTotal === negativeTotal) {
+    if (affirmativeArgument > negativeArgument) return "正方勝";
+    if (negativeArgument > affirmativeArgument) return "反方勝";
+    return "平手";
+  }
   return affirmativeTotal > negativeTotal ? "正方勝" : "反方勝";
+}
+
+function getRecordWinner(record) {
+  return determineWinner(
+    Number(record.totals?.affirmative) || 0,
+    Number(record.totals?.negative) || 0,
+    Number(record.argumentScores?.affirmative) || 0,
+    Number(record.argumentScores?.negative) || 0
+  );
 }
 
 function calculate() {
@@ -221,12 +270,17 @@ function calculate() {
       row.querySelector('[data-field="total"]').value = formatNumber(playerTotal);
       sideTotal += playerTotal;
     });
-    sideTotal += numericValue(els[`${side}Argument`]);
+    sideTotal += numericValue(els[`${side}Argument`]) + numericValue(els[`${side}Closing`]);
     totals[side] = sideTotal;
     els[`${side}Total`].textContent = formatNumber(sideTotal);
   });
 
-  const winner = determineWinner(totals.affirmative, totals.negative);
+  const winner = determineWinner(
+    totals.affirmative,
+    totals.negative,
+    numericValue(els.affirmativeArgument),
+    numericValue(els.negativeArgument)
+  );
   els.winnerText.textContent = winner;
   const players = {
     affirmative: getPlayers("affirmative"),
@@ -253,10 +307,86 @@ function readRecords() {
 
 function writeRecords(records) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+  renderNameSuggestions(records);
   renderMatchSummaries(records);
   renderRecords();
   renderSeasonRankings(records);
   renderCycleControls(records);
+}
+
+function renderNameSuggestions(records = readRecords()) {
+  const judges = new Set();
+  const recorders = new Set();
+  const players = new Set();
+
+  records.forEach((record) => {
+    addSuggestion(judges, record.judge);
+    addSuggestion(recorders, record.recorder);
+    SIDES.forEach((side) => {
+      (record.players?.[side] || []).forEach((player) => addSuggestion(players, player.name));
+    });
+  });
+
+  fillDatalist(els.judgeNameOptions, judges);
+  fillDatalist(els.recorderNameOptions, recorders);
+  fillDatalist(els.playerNameOptions, players);
+}
+
+function addSuggestion(set, value) {
+  const text = String(value || "").trim();
+  if (text) set.add(text);
+}
+
+function fillDatalist(datalist, values) {
+  datalist.innerHTML = "";
+  [...values]
+    .sort((a, b) => a.localeCompare(b, "zh-Hant"))
+    .forEach((value) => datalist.append(new Option(value)));
+}
+
+function setScoreTabOrder() {
+  let tabIndex = 1;
+  const setNext = (element) => {
+    if (!element) return;
+    element.tabIndex = tabIndex;
+    tabIndex += 1;
+  };
+
+  [
+    els.competitionName,
+    els.matchPeriod,
+    els.matchVenue,
+    els.matchDate,
+    els.matchJudge,
+    els.matchRecorder,
+    els.affirmativeTeam,
+    els.negativeTeam,
+  ].forEach(setNext);
+
+  SIDES.forEach((side) => {
+    const rows = [...els[`${side}Rows`].querySelectorAll("tr")];
+    rows.forEach((row) => setNext(row.querySelector('[data-field="name"]')));
+    rows.forEach((row) => {
+      ["speech", "question", "defense"].forEach((field) => {
+        setNext(row.querySelector(`[data-field="${field}"]`));
+      });
+    });
+    setNext(els[`${side}Closing`]);
+    setNext(els[`${side}Argument`]);
+  });
+
+  SIDES.forEach((side) => {
+    els[`${side}Rows`].querySelectorAll('[data-field="note"]').forEach(setNext);
+  });
+
+  [
+    els.saveMatch,
+    els.resetForm,
+    els.exportRecords,
+    els.exportSpreadsheet,
+    els.showSpreadsheetText,
+    els.clearRecords,
+  ].forEach(setNext);
 }
 
 function buildMatchRecord() {
@@ -289,11 +419,20 @@ function buildMatchRecord() {
       affirmative: numericValue(els.affirmativeArgument),
       negative: numericValue(els.negativeArgument),
     },
+    closingScores: {
+      affirmative: numericValue(els.affirmativeClosing),
+      negative: numericValue(els.negativeClosing),
+    },
     totals: {
       affirmative: affirmativeTotal,
       negative: negativeTotal,
     },
-    winner: determineWinner(affirmativeTotal, negativeTotal),
+    winner: determineWinner(
+      affirmativeTotal,
+      negativeTotal,
+      numericValue(els.affirmativeArgument),
+      numericValue(els.negativeArgument)
+    ),
     bestPlayers,
   };
 }
@@ -365,6 +504,61 @@ function resetForm() {
   flashStatus("已清空輸入");
 }
 
+function swapSides() {
+  [els.affirmativeTeam.value, els.negativeTeam.value] = [els.negativeTeam.value, els.affirmativeTeam.value];
+
+  for (let index = 0; index < 3; index += 1) {
+    const affirmativeName = els.affirmativeRows.querySelector(`tr[data-index="${index}"] [data-field="name"]`);
+    const negativeName = els.negativeRows.querySelector(`tr[data-index="${index}"] [data-field="name"]`);
+    [affirmativeName.value, negativeName.value] = [negativeName.value, affirmativeName.value];
+  }
+
+  calculate();
+  renderSeasonRankings();
+  flashStatus("已交換正反方隊伍與選手姓名");
+}
+
+function loadRecordToForm(id) {
+  const record = readRecords().find((item) => item.id === id);
+  if (!record) return;
+
+  els.competitionName.value = record.competitionName || "";
+  els.matchPeriod.value = record.period || "";
+  els.matchVenue.value = record.venue || "";
+  els.matchDate.value = record.matchDate || new Date().toISOString().slice(0, 10);
+  els.matchJudge.value = record.judge || "";
+  els.matchRecorder.value = record.recorder || "";
+  els.affirmativeTeam.value = record.teams?.affirmative || "";
+  els.negativeTeam.value = record.teams?.negative || "";
+  els.affirmativeArgument.value = formatInputNumber(record.argumentScores?.affirmative);
+  els.negativeArgument.value = formatInputNumber(record.argumentScores?.negative);
+  els.affirmativeClosing.value = formatInputNumber(record.closingScores?.affirmative);
+  els.negativeClosing.value = formatInputNumber(record.closingScores?.negative);
+
+  SIDES.forEach((side) => {
+    const rows = els[`${side}Rows`].querySelectorAll("tr");
+    rows.forEach((row, index) => {
+      const player = record.players?.[side]?.[index] || {};
+      row.querySelector('[data-field="name"]').value = player.name || "";
+      row.querySelector('[data-field="speech"]').value = formatInputNumber(player.speech);
+      row.querySelector('[data-field="question"]').value = formatInputNumber(player.question);
+      row.querySelector('[data-field="defense"]').value = formatInputNumber(player.defense);
+      row.querySelector('[data-field="note"]').value = player.note || "";
+    });
+  });
+
+  setBallotPhoto(record.ballotPhoto?.dataUrl ? { ...record.ballotPhoto } : null);
+  calculate();
+  renderSeasonRankings();
+  flashStatus("已帶入紀錄，可繼續編輯");
+}
+
+function formatInputNumber(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number === 0) return "";
+  return formatNumber(number);
+}
+
 function deleteRecord(id) {
   writeRecords(readRecords().filter((record) => record.id !== id));
   flashStatus("已刪除一筆紀錄");
@@ -390,6 +584,29 @@ function exportSpreadsheet() {
   const csv = buildSpreadsheetCsv(exportRecords);
   downloadTextFile(csv, `debate-score-records-${new Date().toISOString().slice(0, 10)}.csv`, "text/csv;charset=utf-8");
   flashStatus("已匯出試算表");
+}
+
+function showSpreadsheetText() {
+  const records = readRecords();
+  const exportRecords = records.length ? records : [buildMatchRecord()];
+  els.spreadsheetTextOutput.value = buildSpreadsheetTsv(exportRecords);
+  els.spreadsheetTextPanel.classList.remove("is-hidden");
+  els.spreadsheetTextOutput.focus();
+  els.spreadsheetTextOutput.select();
+  flashStatus("已顯示貼上用表格");
+}
+
+async function copySpreadsheetText() {
+  if (!els.spreadsheetTextOutput.value) showSpreadsheetText();
+  els.spreadsheetTextOutput.focus();
+  els.spreadsheetTextOutput.select();
+
+  try {
+    await navigator.clipboard.writeText(els.spreadsheetTextOutput.value);
+    flashStatus("已複製貼上用表格");
+  } catch {
+    flashStatus("已選取文字，請按 Command+C 複製");
+  }
 }
 
 async function importSpreadsheet() {
@@ -502,6 +719,10 @@ function buildRecordsFromSpreadsheetCsv(text) {
         affirmative: numberValue(get("正方論點分")),
         negative: numberValue(get("反方論點分")),
       },
+      closingScores: {
+        affirmative: numberValue(get("正方結辯分")),
+        negative: numberValue(get("反方結辯分")),
+      },
       totals: {
         affirmative: numberValue(get("正方總分")),
         negative: numberValue(get("反方總分")),
@@ -535,12 +756,13 @@ function buildRecordsFromSpreadsheetCsv(text) {
         }
       });
       const calculatedTotal = record.players[side].reduce((sum, player) => sum + player.total, 0)
-        + numberValue(record.argumentScores[side]);
+        + numberValue(record.argumentScores[side])
+        + numberValue(record.closingScores?.[side]);
       if (!Number.isFinite(record.totals[side]) || record.totals[side] === 0) {
         record.totals[side] = calculatedTotal;
       }
     });
-    record.winner = record.winner || determineWinner(record.totals.affirmative, record.totals.negative);
+    record.winner = getRecordWinner(record);
     record.bestPlayers = getBestPlayers(record.players, record.teams);
     return record;
   });
@@ -700,10 +922,13 @@ function renderRecords() {
     const dateText = record.matchDate ? `｜${record.matchDate}` : "";
     const judgeText = record.judge ? `｜裁判：${record.judge}` : "";
     const recorderText = record.recorder ? `｜記錄員：${record.recorder}` : "";
-    const affirmativeWon = record.winner === "正方勝";
-    const negativeWon = record.winner === "反方勝";
+    const recordWinner = getRecordWinner(record);
+    const affirmativeWon = recordWinner === "正方勝";
+    const negativeWon = recordWinner === "反方勝";
     const affirmativeArgument = record.argumentScores?.affirmative ?? 0;
     const negativeArgument = record.argumentScores?.negative ?? 0;
+    const affirmativeClosing = record.closingScores?.affirmative ?? 0;
+    const negativeClosing = record.closingScores?.negative ?? 0;
     const bestPlayers = record.bestPlayers?.length
       ? record.bestPlayers
       : getBestPlayers(record.players, record.teams);
@@ -713,9 +938,10 @@ function renderRecords() {
       <div class="record-top">
         <div>
           <h3>${escapeHtml(matchLabel)}</h3>
-          <p class="record-meta">${escapeHtml(competitionText)}${escapeHtml(record.winner)}${escapeHtml(dateText)}${escapeHtml(judgeText)}${escapeHtml(recorderText)}</p>
+          <p class="record-meta">${escapeHtml(competitionText)}${escapeHtml(recordWinner)}${escapeHtml(dateText)}${escapeHtml(judgeText)}${escapeHtml(recorderText)}</p>
         </div>
         <div class="record-actions">
+          <button class="small-action" type="button" data-load="${record.id}">帶入</button>
           <button class="small-action" type="button" data-export="${record.id}">匯出</button>
           <button class="small-action" type="button" data-delete="${record.id}">刪除</button>
         </div>
@@ -723,18 +949,19 @@ function renderRecords() {
       <div class="record-result">
         <div class="record-score ${affirmativeWon ? "is-winner" : ""}">
           <p>${escapeHtml(record.teams.affirmative)}</p>
-          <span>論點 ${formatNumber(affirmativeArgument)}</span>
+          <span>論點 ${formatNumber(affirmativeArgument)}｜結辯 ${formatNumber(affirmativeClosing)}</span>
           <strong>${formatNumber(record.totals.affirmative)}</strong>
         </div>
         <div class="record-score ${negativeWon ? "is-winner" : ""}">
           <p>${escapeHtml(record.teams.negative)}</p>
-          <span>論點 ${formatNumber(negativeArgument)}</span>
+          <span>論點 ${formatNumber(negativeArgument)}｜結辯 ${formatNumber(negativeClosing)}</span>
           <strong>${formatNumber(record.totals.negative)}</strong>
         </div>
       </div>
       <p class="record-best">單場最佳：${escapeHtml(formatBestPlayers(bestPlayers))}</p>
       ${photoHtml}
     `;
+    article.querySelector("[data-load]").addEventListener("click", () => loadRecordToForm(record.id));
     article.querySelector("[data-export]").addEventListener("click", () => exportRecord(record.id));
     article.querySelector("[data-delete]").addEventListener("click", () => deleteRecord(record.id));
     els.recordsList.append(article);
@@ -772,6 +999,10 @@ function getMatchSummaries(records) {
       negativeArgumentTotal: 0,
       affirmativeArgumentVotes: 0,
       negativeArgumentVotes: 0,
+      affirmativeTotalScore: 0,
+      negativeTotalScore: 0,
+      affirmativeSpeakerRankPoints: 0,
+      negativeSpeakerRankPoints: 0,
     };
 
     existing.ballots += 1;
@@ -785,10 +1016,16 @@ function getMatchSummaries(records) {
     } else if (negativeArgument > affirmativeArgument) {
       existing.negativeArgumentVotes += 1;
     }
+    existing.affirmativeTotalScore += Number(record.totals?.affirmative) || 0;
+    existing.negativeTotalScore += Number(record.totals?.negative) || 0;
+    const speakerRankPoints = getTeamSpeakerRankPoints(record);
+    existing.affirmativeSpeakerRankPoints += speakerRankPoints.affirmative;
+    existing.negativeSpeakerRankPoints += speakerRankPoints.negative;
 
-    if (record.winner === "正方勝") {
+    const recordWinner = getRecordWinner(record);
+    if (recordWinner === "正方勝") {
       existing.affirmativeVotes += 1;
-    } else if (record.winner === "反方勝") {
+    } else if (recordWinner === "反方勝") {
       existing.negativeVotes += 1;
     } else {
       existing.unresolvedVotes += 1;
@@ -881,22 +1118,22 @@ function calculateCycle() {
       matchWin: getSummaryWinner(summary) === "正方勝" ? 1 : 0,
       ballotWins: summary.affirmativeVotes,
       argumentPoints: summary.affirmativeArgumentVotes,
+      speakerRankPoints: summary.affirmativeSpeakerRankPoints,
+      totalScore: summary.affirmativeTotalScore,
     });
     addCycleTeamResult(teams, summary.negativeTeam, {
       matchWin: getSummaryWinner(summary) === "反方勝" ? 1 : 0,
       ballotWins: summary.negativeVotes,
       argumentPoints: summary.negativeArgumentVotes,
+      speakerRankPoints: summary.negativeSpeakerRankPoints,
+      totalScore: summary.negativeTotalScore,
     });
   });
 
-  const ranking = [...teams.values()].sort((a, b) =>
-    b.matchWins - a.matchWins ||
-    b.ballotWins - a.ballotWins ||
-    b.argumentPoints - a.argumentPoints ||
-    a.team.localeCompare(b.team)
-  );
+  const rankingRules = getCycleRankingRules();
+  const ranking = [...teams.values()].sort((a, b) => compareCycleTeams(a, b, rankingRules));
 
-  renderCycleResult(ranking);
+  renderCycleResult(ranking, rankingRules);
 }
 
 function addCycleTeamResult(teams, team, result) {
@@ -905,14 +1142,47 @@ function addCycleTeamResult(teams, team, result) {
     matchWins: 0,
     ballotWins: 0,
     argumentPoints: 0,
+    speakerRankPoints: 0,
+    totalScore: 0,
   };
   existing.matchWins += result.matchWin;
   existing.ballotWins += result.ballotWins;
   existing.argumentPoints += result.argumentPoints;
+  existing.speakerRankPoints += result.speakerRankPoints;
+  existing.totalScore += result.totalScore;
   teams.set(team, existing);
 }
 
-function renderCycleResult(ranking) {
+function getTeamSpeakerRankPoints(record) {
+  const points = {
+    affirmative: 0,
+    negative: 0,
+  };
+  const teams = record.teams || {};
+  getRankedMatchPlayers(record.players, teams).forEach((player, index) => {
+    points[player.side] += index + 1;
+  });
+  return points;
+}
+
+function getCycleRankingRules() {
+  const selected = [...els.cycleRankSelects].map((select) => select.value).filter(Boolean);
+  return selected.length ? selected : ["matchWins", "ballotWins", "argumentPoints"];
+}
+
+function compareCycleTeams(a, b, rules) {
+  for (const rule of rules) {
+    const config = CYCLE_RANK_RULES[rule];
+    if (!config) continue;
+    const difference = config.direction === "asc"
+      ? a[rule] - b[rule]
+      : b[rule] - a[rule];
+    if (difference !== 0) return difference;
+  }
+  return a.team.localeCompare(b.team);
+}
+
+function renderCycleResult(ranking, rankingRules) {
   const rows = ranking.map((team, index) => `
     <tr class="${index === 0 ? "is-winner" : ""}">
       <td>${index + 1}</td>
@@ -920,10 +1190,17 @@ function renderCycleResult(ranking) {
       <td>${team.matchWins}</td>
       <td>${team.ballotWins}</td>
       <td>${formatNumber(team.argumentPoints)}</td>
+      <td>${formatNumber(team.speakerRankPoints)}</td>
+      <td>${formatNumber(team.totalScore)}</td>
     </tr>
   `).join("");
+  const ruleText = rankingRules
+    .map((rule) => CYCLE_RANK_RULES[rule]?.label)
+    .filter(Boolean)
+    .join(" > ");
 
   els.cycleResult.innerHTML = `
+    <p class="cycle-rank-summary">目前排序：${escapeHtml(ruleText)}</p>
     <table>
       <thead>
         <tr>
@@ -932,6 +1209,8 @@ function renderCycleResult(ranking) {
           <th>勝場數</th>
           <th>評分單張數</th>
           <th>論點單張數</th>
+          <th>辯士排名加總</th>
+          <th>總分加總</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -986,6 +1265,16 @@ function renderMatchSummaries(records = readRecords()) {
           <p>${escapeHtml(summary.negativeTeam)}</p>
           <strong>${summary.negativeVotes}</strong>
           <span>單勝</span>
+        </div>
+        <div>
+          <p>${escapeHtml(summary.affirmativeTeam)}</p>
+          <strong>${formatNumber(summary.affirmativeSpeakerRankPoints)}</strong>
+          <span>辯士排名加總</span>
+        </div>
+        <div>
+          <p>${escapeHtml(summary.negativeTeam)}</p>
+          <strong>${formatNumber(summary.negativeSpeakerRankPoints)}</strong>
+          <span>辯士排名加總</span>
         </div>
         <div>
           <p>整場結果</p>
@@ -1128,12 +1417,13 @@ function buildReportRecordHtml(record) {
   const judgeText = record.judge ? `｜裁判：${record.judge}` : "";
   const recorderText = record.recorder ? `｜記錄員：${record.recorder}` : "";
   const competitionText = record.competitionName ? `${record.competitionName}｜` : "";
-  const affirmativeWon = record.winner === "正方勝";
-  const negativeWon = record.winner === "反方勝";
+  const recordWinner = getRecordWinner(record);
+  const affirmativeWon = recordWinner === "正方勝";
+  const negativeWon = recordWinner === "反方勝";
 
   return `<article>
     <h2>${escapeHtml(getMatchLabel(record))}</h2>
-    <p class="meta">${escapeHtml(competitionText)}${escapeHtml(record.winner)}${escapeHtml(dateText)}${escapeHtml(judgeText)}${escapeHtml(recorderText)}</p>
+    <p class="meta">${escapeHtml(competitionText)}${escapeHtml(recordWinner)}${escapeHtml(dateText)}${escapeHtml(judgeText)}${escapeHtml(recorderText)}</p>
     <p class="best">單場最佳：${escapeHtml(formatBestPlayers(bestPlayers))}</p>
     ${buildReportRankingHtml(record)}
     <div class="summary">
@@ -1143,7 +1433,7 @@ function buildReportRecordHtml(record) {
       </div>
       <div class="box">
         <p>結果</p>
-        <strong>${escapeHtml(record.winner)}</strong>
+        <strong>${escapeHtml(recordWinner)}</strong>
       </div>
       <div class="box ${negativeWon ? "winner" : ""}">
         <p>${escapeHtml(record.teams.negative)}</p>
@@ -1177,6 +1467,7 @@ function buildReportRankingHtml(record) {
 function buildReportTeamTable(record, side) {
   const players = record.players?.[side] || [];
   const argumentScore = record.argumentScores?.[side] ?? 0;
+  const closingScore = record.closingScores?.[side] ?? 0;
   const teamName = record.teams?.[side] || SIDE_LABELS[side];
   const rows = players.map((player) => `<tr>
     <td>${escapeHtml(player.name || "")}</td>
@@ -1188,7 +1479,7 @@ function buildReportTeamTable(record, side) {
   </tr>`).join("");
 
   return `<table>
-    <caption>${escapeHtml(SIDE_LABELS[side])}｜${escapeHtml(teamName)}｜論點 ${formatNumber(argumentScore)}</caption>
+    <caption>${escapeHtml(SIDE_LABELS[side])}｜${escapeHtml(teamName)}｜論點 ${formatNumber(argumentScore)}｜結辯 ${formatNumber(closingScore)}</caption>
     <thead>
       <tr>
         <th>選手</th>
@@ -1213,6 +1504,14 @@ function escapeHtml(value) {
 }
 
 function buildSpreadsheetCsv(records) {
+  return `\uFEFF${buildSpreadsheetRows(records).map((row) => row.map(csvCell).join(",")).join("\n")}`;
+}
+
+function buildSpreadsheetTsv(records) {
+  return buildSpreadsheetRows(records).map((row) => row.map(tsvCell).join("\t")).join("\n");
+}
+
+function buildSpreadsheetRows(records) {
   const summariesByKey = new Map(getMatchSummaries(records).map((summary) => [summary.key, summary]));
   const rows = [[
     "盃賽名稱",
@@ -1230,6 +1529,8 @@ function buildSpreadsheetCsv(records) {
     "反方隊伍",
     "正方論點分",
     "反方論點分",
+    "正方結辯分",
+    "反方結辯分",
     "正方總分",
     "反方總分",
     "單場最佳",
@@ -1263,7 +1564,7 @@ function buildSpreadsheetCsv(records) {
           record.matchDate || "",
           record.judge || "",
           record.recorder || "",
-          record.winner || "",
+          getRecordWinner(record),
           matchSummary?.affirmativeVotes ?? "",
           matchSummary?.negativeVotes ?? "",
           matchSummary ? getSummaryWinner(matchSummary) : "",
@@ -1272,6 +1573,8 @@ function buildSpreadsheetCsv(records) {
           record.teams?.negative || "",
           record.argumentScores?.affirmative ?? 0,
           record.argumentScores?.negative ?? 0,
+          record.closingScores?.affirmative ?? 0,
+          record.closingScores?.negative ?? 0,
           record.totals?.affirmative ?? 0,
           record.totals?.negative ?? 0,
           formatBestPlayers(record.bestPlayers?.length ? record.bestPlayers : getBestPlayers(record.players, record.teams)),
@@ -1292,12 +1595,19 @@ function buildSpreadsheetCsv(records) {
     });
   });
 
-  return `\uFEFF${rows.map((row) => row.map(csvCell).join(",")).join("\n")}`;
+  return rows;
 }
 
 function csvCell(value) {
   const text = String(value ?? "");
   return `"${text.replaceAll('"', '""')}"`;
+}
+
+function tsvCell(value) {
+  return String(value ?? "")
+    .replaceAll("\t", " ")
+    .replaceAll("\r", " ")
+    .replaceAll("\n", " ");
 }
 
 function downloadTextFile(text, filename, type) {
@@ -1460,8 +1770,10 @@ function flashStatus(message) {
 
 function init() {
   createRows();
+  setScoreTabOrder();
   els.matchDate.value = new Date().toISOString().slice(0, 10);
   document.querySelectorAll(".match-meta input, .panel-heading input").forEach((input) => {
+    prepareNumericInput(input);
     input.addEventListener("input", () => {
       normalizeIntegerInput(input);
       normalizeScoreInput(input);
@@ -1470,6 +1782,7 @@ function init() {
     });
   });
   els.saveMatch.addEventListener("click", saveMatch);
+  els.swapSides.addEventListener("click", swapSides);
   els.ballotPhotoInput.addEventListener("change", handleBallotPhotoChange);
   els.removeBallotPhoto.addEventListener("click", () => {
     setBallotPhoto(null);
@@ -1479,6 +1792,8 @@ function init() {
   els.resetForm.addEventListener("click", resetForm);
   els.exportRecords.addEventListener("click", exportRecords);
   els.exportSpreadsheet.addEventListener("click", exportSpreadsheet);
+  els.showSpreadsheetText.addEventListener("click", showSpreadsheetText);
+  els.copySpreadsheetText.addEventListener("click", copySpreadsheetText);
   els.importSpreadsheet.addEventListener("change", importSpreadsheet);
   els.clearRecords.addEventListener("click", clearRecords);
   els.tabButtons.forEach((button) => {
@@ -1495,9 +1810,13 @@ function init() {
   els.cycleMatchSelects.forEach((select) => {
     select.addEventListener("change", calculateCycle);
   });
+  els.cycleRankSelects.forEach((select) => {
+    select.addEventListener("change", calculateCycle);
+  });
   calculate();
   renderMatchSummaries();
   renderRecords();
+  renderNameSuggestions();
   renderSeasonRankings();
   renderCycleControls();
   updateCloudStatus();

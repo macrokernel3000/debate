@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>辯論比賽計分紀錄</title>
-    <link rel="stylesheet" href="styles.css?v=20260608-5" />
+    <link rel="stylesheet" href="styles.css?v=20260608-14" />
   </head>
   <body>
     <main class="app">
@@ -41,11 +41,11 @@
         </label>
         <label>
           裁判
-          <input id="matchJudge" type="text" placeholder="裁判姓名" />
+          <input id="matchJudge" type="text" list="judgeNameOptions" placeholder="裁判姓名" />
         </label>
         <label>
           記錄員
-          <input id="matchRecorder" type="text" placeholder="記錄員姓名" />
+          <input id="matchRecorder" type="text" list="recorderNameOptions" placeholder="記錄員姓名" />
         </label>
       </section>
 
@@ -116,8 +116,12 @@
             <h2>正方</h2>
             <input id="affirmativeTeam" type="text" placeholder="學校或隊伍名稱" />
             <label class="side-argument">
+              結辯
+              <input id="affirmativeClosing" type="number" min="0" max="50" step="1" inputmode="numeric" />
+            </label>
+            <label class="side-argument">
               論點分
-              <input id="affirmativeArgument" type="number" min="-10" max="100" step="1" inputmode="numeric" />
+              <input id="affirmativeArgument" type="number" min="0" max="20" step="1" inputmode="numeric" />
             </label>
           </div>
           <div class="table-wrap">
@@ -145,13 +149,21 @@
           </div>
         </article>
 
+        <div class="swap-panel">
+          <button id="swapSides" type="button">正反對調</button>
+        </div>
+
         <article class="team-panel" data-side="negative">
           <div class="panel-heading">
             <h2>反方</h2>
             <input id="negativeTeam" type="text" placeholder="學校或隊伍名稱" />
             <label class="side-argument">
+              結辯
+              <input id="negativeClosing" type="number" min="0" max="50" step="1" inputmode="numeric" />
+            </label>
+            <label class="side-argument">
               論點分
-              <input id="negativeArgument" type="number" min="-10" max="100" step="1" inputmode="numeric" />
+              <input id="negativeArgument" type="number" min="0" max="20" step="1" inputmode="numeric" />
             </label>
           </div>
           <div class="table-wrap">
@@ -185,11 +197,20 @@
         <button id="resetForm" type="button">清空輸入</button>
         <button id="exportRecords" type="button">匯出全部報表</button>
         <button id="exportSpreadsheet" type="button">匯出試算表</button>
+        <button id="showSpreadsheetText" type="button">顯示貼上用表格</button>
         <label class="import-action">
           匯入試算表
           <input id="importSpreadsheet" type="file" accept=".csv,text/csv" />
         </label>
         <button class="danger" id="clearRecords" type="button">刪除全部紀錄</button>
+      </section>
+
+      <section id="spreadsheetTextPanel" class="spreadsheet-text-panel is-hidden" aria-label="貼上用表格">
+        <div class="section-heading">
+          <h2>貼上用表格</h2>
+          <button id="copySpreadsheetText" type="button">複製文字</button>
+        </div>
+        <textarea id="spreadsheetTextOutput" readonly spellcheck="false"></textarea>
       </section>
 
       <section class="match-summary-section" aria-label="場次勝負統計">
@@ -244,10 +265,64 @@
           <div class="cycle-rule">
             <strong>出循環規則</strong>
             <ol>
-              <li>先比勝場數，勝場多者出循環。</li>
+              <li>預設先比勝場數，勝場多者出循環。</li>
               <li>勝場相同時，比評分單張數，單勝張數多者出循環。</li>
               <li>評分單張數相同時，比論點單張數，拿到較多裁判論點單者出循環。</li>
             </ol>
+          </div>
+          <div class="cycle-rank-controls" aria-label="循環排序順位">
+            <label>
+              第一順位
+              <select class="cycle-rank-select" id="cycleRankRule1">
+                <option value="matchWins">勝場數</option>
+                <option value="ballotWins">評分單張數</option>
+                <option value="argumentPoints">論點單張數</option>
+                <option value="speakerRankPoints">辯士排名加總</option>
+                <option value="totalScore">總分加總</option>
+              </select>
+            </label>
+            <label>
+              第二順位
+              <select class="cycle-rank-select" id="cycleRankRule2">
+                <option value="matchWins">勝場數</option>
+                <option value="ballotWins" selected>評分單張數</option>
+                <option value="argumentPoints">論點單張數</option>
+                <option value="speakerRankPoints">辯士排名加總</option>
+                <option value="totalScore">總分加總</option>
+              </select>
+            </label>
+            <label>
+              第三順位
+              <select class="cycle-rank-select" id="cycleRankRule3">
+                <option value="matchWins">勝場數</option>
+                <option value="ballotWins">評分單張數</option>
+                <option value="argumentPoints" selected>論點單張數</option>
+                <option value="speakerRankPoints">辯士排名加總</option>
+                <option value="totalScore">總分加總</option>
+              </select>
+            </label>
+            <label>
+              第四順位
+              <select class="cycle-rank-select" id="cycleRankRule4">
+                <option value="">不使用</option>
+                <option value="matchWins">勝場數</option>
+                <option value="ballotWins">評分單張數</option>
+                <option value="argumentPoints">論點單張數</option>
+                <option value="speakerRankPoints" selected>辯士排名加總</option>
+                <option value="totalScore">總分加總</option>
+              </select>
+            </label>
+            <label>
+              第五順位
+              <select class="cycle-rank-select" id="cycleRankRule5">
+                <option value="">不使用</option>
+                <option value="matchWins">勝場數</option>
+                <option value="ballotWins">評分單張數</option>
+                <option value="argumentPoints">論點單張數</option>
+                <option value="speakerRankPoints">辯士排名加總</option>
+                <option value="totalScore" selected>總分加總</option>
+              </select>
+            </label>
           </div>
           <div id="cycleResult" class="cycle-result"></div>
         </section>
@@ -256,7 +331,7 @@
 
     <template id="playerRowTemplate">
       <tr>
-        <td><input data-field="name" type="text" placeholder="姓名" /></td>
+        <td><input data-field="name" type="text" list="playerNameOptions" placeholder="姓名" /></td>
         <td><input data-field="speech" type="number" min="-10" max="100" step="1" inputmode="numeric" /></td>
         <td><input data-field="question" type="number" min="-10" max="100" step="1" inputmode="numeric" /></td>
         <td><input data-field="defense" type="number" min="-10" max="100" step="1" inputmode="numeric" /></td>
@@ -265,6 +340,10 @@
       </tr>
     </template>
 
-    <script src="app.js?v=20260608-5"></script>
+    <datalist id="judgeNameOptions"></datalist>
+    <datalist id="recorderNameOptions"></datalist>
+    <datalist id="playerNameOptions"></datalist>
+
+    <script src="app.js?v=20260608-14"></script>
   </body>
 </html>

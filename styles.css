@@ -138,6 +138,7 @@ input:focus {
 .best-panel,
 .teams,
 .actions,
+.spreadsheet-text-panel,
 .match-summary-section,
 .records-section {
   margin-top: 16px;
@@ -239,6 +240,15 @@ input:focus {
   border-bottom: 1px solid var(--line);
 }
 
+.cycle-rank-controls {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(140px, 1fr));
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid var(--line);
+  background: #fff;
+}
+
 select {
   width: 100%;
   min-height: 38px;
@@ -284,7 +294,14 @@ select {
 }
 
 .cycle-result table {
-  min-width: 680px;
+  min-width: 860px;
+}
+
+.cycle-rank-summary {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .cycle-result tr.is-winner td {
@@ -468,9 +485,22 @@ label.import-action {
   box-shadow: var(--shadow);
 }
 
+.swap-panel {
+  display: flex;
+  justify-content: center;
+  margin: -4px 0;
+}
+
+.swap-panel button {
+  border-color: #b8c6d6;
+  color: var(--blue);
+  font-weight: 800;
+  background: #fff;
+}
+
 .panel-heading {
   display: grid;
-  grid-template-columns: 120px minmax(280px, 720px) 150px;
+  grid-template-columns: 120px minmax(260px, 1fr) 150px 150px;
   align-items: center;
   justify-content: start;
   gap: 12px;
@@ -560,6 +590,33 @@ td input[data-field="defense"] {
   align-items: center;
 }
 
+.spreadsheet-text-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.spreadsheet-text-panel .section-heading {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.spreadsheet-text-panel textarea {
+  display: block;
+  width: 100%;
+  min-height: 260px;
+  border: 0;
+  border-radius: 0 0 8px 8px;
+  padding: 14px 16px;
+  color: var(--ink);
+  background: #fbfcfe;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
 .match-summary-section,
 .records-section {
   border: 1px solid var(--line);
@@ -623,7 +680,7 @@ td input[data-field="defense"] {
 
 .summary-votes {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
   gap: 10px;
 }
 
@@ -760,6 +817,7 @@ td input[data-field="defense"] {
   .ballot-photo-panel,
   .cloud-panel,
   .cycle-controls,
+  .cycle-rank-controls,
   .scoreboard,
   .best-panel,
   .match-summary,
