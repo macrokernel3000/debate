@@ -998,6 +998,12 @@ td input[data-field="defense"] {
   font: inherit;
 }
 
+.summary-export-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 16px 16px;
+}
+
 button.is-saved {
   border-color: var(--green);
   color: #fff;

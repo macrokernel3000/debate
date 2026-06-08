@@ -80,6 +80,7 @@ const els = {
   clearRecords: document.querySelector("#clearRecords"),
   matchSummaryList: document.querySelector("#matchSummaryList"),
   matchSummaryCount: document.querySelector("#matchSummaryCount"),
+  exportFilteredSpreadsheet: document.querySelector("#exportFilteredSpreadsheet"),
   recordCompetitionFilter: document.querySelector("#recordCompetitionFilter"),
   recordPeriodFilter: document.querySelector("#recordPeriodFilter"),
   recordVenueFilter: document.querySelector("#recordVenueFilter"),
@@ -111,9 +112,12 @@ const els = {
   playerSelfDefense: document.querySelector("#playerSelfDefense"),
   playerSelfNote: document.querySelector("#playerSelfNote"),
   savePlayerSelfRecord: document.querySelector("#savePlayerSelfRecord"),
+  playerGrowthTeam: document.querySelector("#playerGrowthTeam"),
   playerGrowthName: document.querySelector("#playerGrowthName"),
   playerGrowthMetric: document.querySelector("#playerGrowthMetric"),
   playerGrowthCompetition: document.querySelector("#playerGrowthCompetition"),
+  playerGrowthTeamOptions: document.querySelector("#playerGrowthTeamOptions"),
+  playerGrowthPlayerOptions: document.querySelector("#playerGrowthPlayerOptions"),
   renderPlayerGrowth: document.querySelector("#renderPlayerGrowth"),
   rankingCompetition: document.querySelector("#rankingCompetition"),
   rankingMinAppearances: document.querySelector("#rankingMinAppearances"),
@@ -718,20 +722,36 @@ function exportRecords() {
 
 function exportSpreadsheet() {
   const records = readRecords();
-  const exportRecords = records.length ? records : [buildMatchRecord()];
-  const csv = buildSpreadsheetCsv(exportRecords, readRosters());
+  const filteredRecords = getFilteredRecords(records);
+  const exportRecords = records.length ? filteredRecords : [buildMatchRecord()];
+  if (records.length && !exportRecords.length) {
+    flashStatus("目前篩選沒有可匯出的資料");
+    return;
+  }
+  const csv = buildSpreadsheetCsv(exportRecords, getFilteredRostersForExport());
   downloadTextFile(csv, `debate-score-data-${new Date().toISOString().slice(0, 10)}.csv`, "text/csv;charset=utf-8");
-  flashStatus("已匯出計分紀錄與檢錄名單");
+  flashStatus(`已匯出 ${exportRecords.length} 張裁判表與檢錄名單`);
 }
 
 function showSpreadsheetText() {
   const records = readRecords();
-  const exportRecords = records.length ? records : [buildMatchRecord()];
-  els.spreadsheetTextOutput.value = buildSpreadsheetTsv(exportRecords, readRosters());
+  const filteredRecords = getFilteredRecords(records);
+  const exportRecords = records.length ? filteredRecords : [buildMatchRecord()];
+  if (records.length && !exportRecords.length) {
+    flashStatus("目前篩選沒有可顯示的資料");
+    return;
+  }
+  els.spreadsheetTextOutput.value = buildSpreadsheetTsv(exportRecords, getFilteredRostersForExport());
   els.spreadsheetTextPanel.classList.remove("is-hidden");
   els.spreadsheetTextOutput.focus();
   els.spreadsheetTextOutput.select();
   flashStatus("已顯示計分紀錄與檢錄名單表格");
+}
+
+function getFilteredRostersForExport() {
+  const rosters = readRosters();
+  if (!recordFilters.competition) return rosters;
+  return rosters.filter((roster) => (roster.competitionName || "未命名盃賽") === recordFilters.competition);
 }
 
 async function copySpreadsheetText() {
@@ -1219,6 +1239,11 @@ function renderRecords() {
   });
 }
 
+function refreshFilteredRecordViews() {
+  renderMatchSummaries();
+  renderRecords();
+}
+
 function buildRecordPhotoHtml(record) {
   if (!record.ballotPhoto?.dataUrl) return "";
   return `<div class="record-photo">
@@ -1577,8 +1602,9 @@ function getAllPlayerGrowthEntries() {
   });
 }
 
-function getPlayerWinRateEntries(playerName, competitionFilter = "") {
+function getPlayerWinRateEntries(playerName, competitionFilter = "", teamFilter = "") {
   const normalizedPlayer = normalizeName(playerName);
+  const normalizedTeam = normalizeTeamName(teamFilter);
   if (!normalizedPlayer) return [];
 
   const summariesByKey = new Map(getMatchSummaries(readRecords()).map((summary) => [summary.key, summary]));
@@ -1588,6 +1614,7 @@ function getPlayerWinRateEntries(playerName, competitionFilter = "") {
     if (competitionFilter && normalizeCompetitionName(record.competitionName) !== normalizeCompetitionName(competitionFilter)) return;
 
     SIDES.forEach((side) => {
+      if (normalizedTeam && normalizeTeamName(record.teams?.[side]) !== normalizedTeam) return;
       const hasPlayer = (record.players?.[side] || []).some((player) => normalizeName(player.name) === normalizedPlayer);
       if (!hasPlayer) return;
 
@@ -1779,6 +1806,45 @@ function getMetricChartMax(metric) {
   return 100;
 }
 
+function getPlayerGrowthTeamOptions(entries = getAllPlayerGrowthEntries()) {
+  const teams = new Set();
+  const competition = normalizeCompetitionName(els.playerGrowthCompetition?.value || "");
+  entries.forEach((entry) => {
+    if (competition && normalizeCompetitionName(entry.competitionName) !== competition) return;
+    addSuggestion(teams, entry.team);
+  });
+  readRosters().forEach((roster) => {
+    if (isCompetitionMarker(roster)) return;
+    if (competition && normalizeCompetitionName(roster.competitionName) !== competition) return;
+    addSuggestion(teams, roster.team);
+  });
+  return teams;
+}
+
+function getPlayerGrowthPlayerOptions(entries = getAllPlayerGrowthEntries()) {
+  const players = new Set();
+  const team = normalizeTeamName(els.playerGrowthTeam?.value || "");
+  const competition = normalizeCompetitionName(els.playerGrowthCompetition?.value || "");
+  if (!team) return players;
+
+  entries.forEach((entry) => {
+    if (competition && normalizeCompetitionName(entry.competitionName) !== competition) return;
+    if (normalizeTeamName(entry.team) === team) addSuggestion(players, entry.name);
+  });
+  readRosters().forEach((roster) => {
+    if (isCompetitionMarker(roster)) return;
+    if (competition && normalizeCompetitionName(roster.competitionName) !== competition) return;
+    if (normalizeTeamName(roster.team) !== team) return;
+    (roster.players || []).forEach((player) => addSuggestion(players, player));
+  });
+  return players;
+}
+
+function renderPlayerGrowthSuggestions(entries = getAllPlayerGrowthEntries()) {
+  if (els.playerGrowthTeamOptions) fillDatalist(els.playerGrowthTeamOptions, getPlayerGrowthTeamOptions(entries));
+  if (els.playerGrowthPlayerOptions) fillDatalist(els.playerGrowthPlayerOptions, getPlayerGrowthPlayerOptions(entries));
+}
+
 function renderPlayerGrowthOptions() {
   if (!els.playerGrowthCompetition) return;
   const entries = getAllPlayerGrowthEntries();
@@ -1786,17 +1852,23 @@ function renderPlayerGrowthOptions() {
   const current = els.playerGrowthCompetition.value;
   els.playerGrowthCompetition.innerHTML = '<option value="">全部盃賽</option>' + competitions.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("");
   if (competitions.includes(current)) els.playerGrowthCompetition.value = current;
+  renderPlayerGrowthSuggestions(entries);
 }
 
 function renderPlayerGrowth() {
   if (!els.playerGrowthName) return;
   const name = els.playerGrowthName.value.trim() || els.playerSelfName?.value.trim() || "";
+  const team = els.playerGrowthTeam?.value.trim() || "";
   const metric = els.playerGrowthMetric.value || "totalAverage";
   const competition = els.playerGrowthCompetition.value || "";
   const entries = getAllPlayerGrowthEntries();
+  const matchingEntries = entries.filter((entry) =>
+    normalizeName(entry.name) === normalizeName(name) &&
+    (!team || normalizeTeamName(entry.team) === normalizeTeamName(team))
+  );
   let playerEntries = metric === "winRate"
-    ? getPlayerWinRateEntries(name, competition)
-    : getPlayerTimelineEntries(entries.filter((entry) => normalizeName(entry.name) === normalizeName(name)));
+    ? getPlayerWinRateEntries(name, competition, team)
+    : getPlayerTimelineEntries(matchingEntries);
   if (competition && metric !== "winRate") {
     playerEntries = playerEntries.filter((entry) => normalizeCompetitionName(entry.competitionName) === normalizeCompetitionName(competition));
   }
@@ -2062,14 +2134,18 @@ function switchView(viewId) {
 }
 
 function renderMatchSummaries(records = readRecords()) {
-  const summaries = getMatchSummaries(records);
-  els.matchSummaryCount.textContent = `${summaries.length} 場`;
+  const filteredRecords = getFilteredRecords(records);
+  const summaries = getMatchSummaries(filteredRecords);
+  const allSummaries = getMatchSummaries(records);
+  els.matchSummaryCount.textContent = recordFilters.competition || recordFilters.period || recordFilters.venue
+    ? `${summaries.length} / ${allSummaries.length} 場`
+    : `${summaries.length} 場`;
   els.matchSummaryList.innerHTML = "";
 
   if (!summaries.length) {
     const empty = document.createElement("p");
     empty.className = "empty-records";
-    empty.textContent = "儲存裁判表後，這裡會自動統計同一場比賽的票數。";
+    empty.textContent = records.length ? "目前篩選沒有符合的場次。" : "儲存裁判表後，這裡會自動統計同一場比賽的票數。";
     els.matchSummaryList.append(empty);
     return;
   }
@@ -2972,7 +3048,7 @@ function checkUnknownPlayerForRoster(side, input) {
   }
 
   const roster = getRosterForSide(side);
-  if (!roster || !Array.isArray(roster.players) || !roster.players.length) {
+  if (!roster || !Array.isArray(roster.players)) {
     hideNewPlayerPrompt(side);
     return;
   }
@@ -3157,25 +3233,25 @@ function init() {
   els.rosterCompetition.addEventListener("input", renderNameSuggestions);
   els.saveMatch.addEventListener("click", saveMatch);
   els.saveRosterTeam.addEventListener("click", saveRosterTeam);
-  els.loadAffirmativeRoster.addEventListener("click", () => loadRosterToSide("affirmative"));
-  els.loadNegativeRoster.addEventListener("click", () => loadRosterToSide("negative"));
-  els.affirmativeRosterSelect.addEventListener("change", () => {
+  if (els.loadAffirmativeRoster) els.loadAffirmativeRoster.addEventListener("click", () => loadRosterToSide("affirmative"));
+  if (els.loadNegativeRoster) els.loadNegativeRoster.addEventListener("click", () => loadRosterToSide("negative"));
+  if (els.affirmativeRosterSelect) els.affirmativeRosterSelect.addEventListener("change", () => {
     renderRosterPlayerPicks("affirmative");
     checkUnknownPlayersForSide("affirmative");
   });
-  els.negativeRosterSelect.addEventListener("change", () => {
+  if (els.negativeRosterSelect) els.negativeRosterSelect.addEventListener("change", () => {
     renderRosterPlayerPicks("negative");
     checkUnknownPlayersForSide("negative");
   });
   SIDES.forEach((side) => {
-    els[`${side}Team`].addEventListener("input", () => { renderSidePlayerSuggestions(side); renderRosters(); });
+    els[`${side}Team`].addEventListener("input", () => { renderSidePlayerSuggestions(side); checkUnknownPlayersForSide(side); });
     els[`${side}Team`].addEventListener("blur", () => checkUnknownTeamForRoster(side));
-    els[`${side}Team`].addEventListener("change", () => { checkUnknownTeamForRoster(side); renderSidePlayerSuggestions(side); });
+    els[`${side}Team`].addEventListener("change", () => { checkUnknownTeamForRoster(side); renderSidePlayerSuggestions(side); checkUnknownPlayersForSide(side); });
   });
-  els.recordCompetitionFilter.addEventListener("change", () => { recordFilters.competition = els.recordCompetitionFilter.value; renderRecords(); });
-  els.recordPeriodFilter.addEventListener("change", () => { recordFilters.period = els.recordPeriodFilter.value; renderRecords(); });
-  els.recordVenueFilter.addEventListener("change", () => { recordFilters.venue = els.recordVenueFilter.value; renderRecords(); });
-  els.clearRecordFilters.addEventListener("click", () => { recordFilters.competition = ""; recordFilters.period = ""; recordFilters.venue = ""; renderRecords(); });
+  els.recordCompetitionFilter.addEventListener("change", () => { recordFilters.competition = els.recordCompetitionFilter.value; refreshFilteredRecordViews(); });
+  els.recordPeriodFilter.addEventListener("change", () => { recordFilters.period = els.recordPeriodFilter.value; refreshFilteredRecordViews(); });
+  els.recordVenueFilter.addEventListener("change", () => { recordFilters.venue = els.recordVenueFilter.value; refreshFilteredRecordViews(); });
+  els.clearRecordFilters.addEventListener("click", () => { recordFilters.competition = ""; recordFilters.period = ""; recordFilters.venue = ""; refreshFilteredRecordViews(); });
   els.swapSides.addEventListener("click", swapSides);
   els.ballotPhotoInput.addEventListener("change", handleBallotPhotoChange);
   els.removeBallotPhoto.addEventListener("click", () => {
@@ -3187,6 +3263,7 @@ function init() {
   els.resetForm.addEventListener("click", () => { if (confirmDiscardUnsaved("清空輸入")) resetForm(); });
   els.exportRecords.addEventListener("click", exportRecords);
   els.exportSpreadsheet.addEventListener("click", exportSpreadsheet);
+  if (els.exportFilteredSpreadsheet) els.exportFilteredSpreadsheet.addEventListener("click", exportSpreadsheet);
   els.showSpreadsheetText.addEventListener("click", showSpreadsheetText);
   els.copySpreadsheetText.addEventListener("click", copySpreadsheetText);
   els.importSpreadsheet.addEventListener("change", importSpreadsheet);
@@ -3196,9 +3273,21 @@ function init() {
   els.clearRecords.addEventListener("click", clearRecords);
   if (els.savePlayerSelfRecord) els.savePlayerSelfRecord.addEventListener("click", savePlayerSelfRecord);
   if (els.renderPlayerGrowth) els.renderPlayerGrowth.addEventListener("click", renderPlayerGrowth);
-  [els.playerGrowthName, els.playerGrowthMetric, els.playerGrowthCompetition].forEach((element) => {
+  [els.playerGrowthName, els.playerGrowthTeam, els.playerGrowthMetric, els.playerGrowthCompetition].forEach((element) => {
     if (element) element.addEventListener("change", renderPlayerGrowth);
   });
+  if (els.playerGrowthTeam) {
+    els.playerGrowthTeam.addEventListener("input", () => {
+      renderPlayerGrowthSuggestions();
+      renderPlayerGrowth();
+    });
+  }
+  if (els.playerGrowthCompetition) {
+    els.playerGrowthCompetition.addEventListener("change", () => {
+      renderPlayerGrowthSuggestions();
+      renderPlayerGrowth();
+    });
+  }
   [els.rankingCompetition, els.rankingMinAppearances, els.rankingBestCount].forEach((element) => {
     if (element) element.addEventListener("change", () => renderTournamentRankings());
   });

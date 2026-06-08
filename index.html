@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>辯論比賽計分紀錄</title>
-    <link rel="stylesheet" href="styles.css?v=20260608-25" />
+    <link rel="stylesheet" href="styles.css?v=20260609-01" />
   </head>
   <body>
     <main class="app">
@@ -85,16 +85,8 @@
               <input id="affirmativeArgument" type="number" min="0" max="20" step="1" inputmode="numeric" />
             </label>
           </div>
-          <div class="side-roster-load" aria-label="正方檢錄名單帶入">
-            <label>
-              從賽事檢錄帶入正方
-              <select id="affirmativeRosterSelect"></select>
-            </label>
-            <button id="loadAffirmativeRoster" type="button">帶入正方</button>
-            <div id="affirmativeRosterPlayers" class="roster-player-picks" aria-label="正方隊內選手快速選擇"></div>
-            <div id="affirmativeNewTeamPrompt" class="new-player-prompt is-hidden" aria-live="polite"></div>
-            <div id="affirmativeNewPlayerPrompt" class="new-player-prompt is-hidden" aria-live="polite"></div>
-          </div>
+          <div id="affirmativeNewTeamPrompt" class="new-player-prompt is-hidden" aria-live="polite"></div>
+          <div id="affirmativeNewPlayerPrompt" class="new-player-prompt is-hidden" aria-live="polite"></div>
           <div class="table-wrap">
             <table>
               <colgroup>
@@ -137,16 +129,8 @@
               <input id="negativeArgument" type="number" min="0" max="20" step="1" inputmode="numeric" />
             </label>
           </div>
-          <div class="side-roster-load" aria-label="反方檢錄名單帶入">
-            <label>
-              從賽事檢錄帶入反方
-              <select id="negativeRosterSelect"></select>
-            </label>
-            <button id="loadNegativeRoster" type="button">帶入反方</button>
-            <div id="negativeRosterPlayers" class="roster-player-picks" aria-label="反方隊內選手快速選擇"></div>
-            <div id="negativeNewTeamPrompt" class="new-player-prompt is-hidden" aria-live="polite"></div>
-            <div id="negativeNewPlayerPrompt" class="new-player-prompt is-hidden" aria-live="polite"></div>
-          </div>
+          <div id="negativeNewTeamPrompt" class="new-player-prompt is-hidden" aria-live="polite"></div>
+          <div id="negativeNewPlayerPrompt" class="new-player-prompt is-hidden" aria-live="polite"></div>
           <div class="table-wrap">
             <table>
               <colgroup>
@@ -240,19 +224,22 @@
           <h2>場次勝負統計</h2>
           <p id="matchSummaryCount">0 場</p>
         </div>
+        <div class="record-filters" aria-label="場次勝負統計篩選">
+          <label>盃賽 <select id="recordCompetitionFilter"></select></label>
+          <label>時段 <select id="recordPeriodFilter"></select></label>
+          <label>會場 <select id="recordVenueFilter"></select></label>
+          <button id="clearRecordFilters" type="button">顯示全部</button>
+        </div>
         <div id="matchSummaryList" class="match-summary-list"></div>
+        <div class="summary-export-actions">
+          <button id="exportFilteredSpreadsheet" type="button">匯出選定資料</button>
+        </div>
       </section>
 
       <section class="records-section" aria-label="歷史紀錄">
         <div class="section-heading">
           <h2>比賽紀錄</h2>
           <p id="recordCount">0 筆</p>
-        </div>
-        <div class="record-filters" aria-label="比賽紀錄快速篩選">
-          <label>盃賽 <select id="recordCompetitionFilter"></select></label>
-          <label>時段 <select id="recordPeriodFilter"></select></label>
-          <label>會場 <select id="recordVenueFilter"></select></label>
-          <button id="clearRecordFilters" type="button">顯示全部</button>
         </div>
         <div id="recordsList" class="records-list"></div>
       </section>
@@ -262,7 +249,7 @@
         <section class="roster-section roster-page" aria-label="檢錄賽事選手名單">
           <div class="section-heading">
             <h2>賽事檢錄</h2>
-            <p>先建立盃賽、隊伍與選手。回到「計分紀錄」時，可以直接把隊伍名單帶入正方或反方。</p>
+            <p>先建立盃賽、隊伍與選手。回到「計分紀錄」時，隊伍與選手欄位會自動提供搜尋與新增提醒。</p>
           </div>
           <div class="roster-editor">
             <label>
@@ -397,8 +384,9 @@
           <div class="player-entry-grid single">
             <article class="player-card">
               <h3>選手統計</h3>
-              <div class="player-form-grid compact">
-                <label>選手姓名<input id="playerGrowthName" type="text" list="playerNameOptions" placeholder="選擇或輸入姓名" /></label>
+              <div class="player-form-grid">
+                <label>隊伍／學校<input id="playerGrowthTeam" type="text" list="playerGrowthTeamOptions" placeholder="先選隊伍或學校" /></label>
+                <label>選手姓名<input id="playerGrowthName" type="text" list="playerGrowthPlayerOptions" placeholder="再選擇或輸入姓名" /></label>
                 <label>觀察項目
                   <select id="playerGrowthMetric">
                     <option value="totalAverage">總分平均</option>
@@ -506,8 +494,10 @@
     <datalist id="affirmativePlayerNameOptions"></datalist>
     <datalist id="negativePlayerNameOptions"></datalist>
     <datalist id="playerNameOptions"></datalist>
+    <datalist id="playerGrowthTeamOptions"></datalist>
+    <datalist id="playerGrowthPlayerOptions"></datalist>
     <datalist id="teamNameOptions"></datalist>
 
-    <script src="app.js?v=20260608-25"></script>
+    <script src="app.js?v=20260609-01"></script>
   </body>
 </html>
