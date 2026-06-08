@@ -1104,10 +1104,17 @@ function getSeasonRankings(records) {
 }
 
 function renderSeasonRankings(records = readRecords()) {
-  const rankings = getSeasonRankings(records).slice(0, 6);
+  const activeCompetition = getActiveCompetitionName();
+  const rankings = getSeasonRankings(
+    records.filter((record) => (record.competitionName || "未命名盃賽") === activeCompetition)
+  ).slice(0, 6);
   renderRankingList(els.seasonRankings, rankings, (player) =>
     `${player.name}（${player.team}，平均名次 ${formatNumber(player.averageRank)}，總名次分 ${formatNumber(player.rankPoints)}，${player.appearances} 場）`
   );
+}
+
+function getActiveCompetitionName() {
+  return els.competitionName.value.trim() || "未命名盃賽";
 }
 
 function getPlayerKey(name, team) {
@@ -1141,6 +1148,7 @@ function init() {
       normalizeIntegerInput(input);
       normalizeScoreInput(input);
       calculate();
+      if (input === els.competitionName) renderSeasonRankings();
     });
   });
   els.saveMatch.addEventListener("click", saveMatch);
