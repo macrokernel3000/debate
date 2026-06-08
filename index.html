@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>辯論比賽計分紀錄</title>
-    <link rel="stylesheet" href="styles.css?v=20260608-2" />
+    <link rel="stylesheet" href="styles.css?v=20260608-5" />
   </head>
   <body>
     <main class="app">
@@ -49,6 +49,21 @@
         </label>
       </section>
 
+      <section class="ballot-photo-panel" aria-label="評分單照片">
+        <div>
+          <p>評分單照片</p>
+          <strong id="ballotPhotoStatus">尚未附加照片</strong>
+        </div>
+        <label class="photo-upload">
+          <span>拍照或選擇圖片</span>
+          <input id="ballotPhotoInput" type="file" accept="image/*" capture="environment" />
+        </label>
+        <button id="removeBallotPhoto" type="button" disabled>移除照片</button>
+        <figure id="ballotPhotoPreview" class="photo-preview is-empty">
+          <span>照片預覽</span>
+        </figure>
+      </section>
+
       <section class="cloud-panel is-hidden" aria-label="雲端儲存設定">
         <div>
           <p>雲端儲存</p>
@@ -67,7 +82,6 @@
             <p>正方總分</p>
             <strong id="affirmativeTotal">0</strong>
           </div>
-          <span id="affirmativeBadge">待輸入</span>
         </article>
         <article class="winner-card">
           <p>目前結果</p>
@@ -78,7 +92,6 @@
             <p>反方總分</p>
             <strong id="negativeTotal">0</strong>
           </div>
-          <span id="negativeBadge">待輸入</span>
         </article>
       </section>
 
@@ -92,7 +105,7 @@
           <ol id="matchRankings" class="ranking-list"></ol>
         </article>
         <article>
-          <p>全程辯士排行（本盃賽）</p>
+          <p>全程辯士排行</p>
           <ol id="seasonRankings" class="ranking-list"></ol>
         </article>
       </section>
@@ -172,6 +185,10 @@
         <button id="resetForm" type="button">清空輸入</button>
         <button id="exportRecords" type="button">匯出全部報表</button>
         <button id="exportSpreadsheet" type="button">匯出試算表</button>
+        <label class="import-action">
+          匯入試算表
+          <input id="importSpreadsheet" type="file" accept=".csv,text/csv" />
+        </label>
         <button class="danger" id="clearRecords" type="button">刪除全部紀錄</button>
       </section>
 
@@ -202,9 +219,9 @@
             <label>
               循環類型
               <select id="cycleType">
-                <option value="single">單淘（一場定生死）</option>
-                <option value="mutual">互咬（兩場交換持方）</option>
-                <option value="triangle">三角循環（三間學校）</option>
+                <option value="single">單淘</option>
+                <option value="mutual">互咬</option>
+                <option value="triangle">三角循環</option>
               </select>
             </label>
             <label>
@@ -226,7 +243,11 @@
           </div>
           <div class="cycle-rule">
             <strong>出循環規則</strong>
-            <p>先比勝場數；勝場相同，比評分單張數；評分單張數相同，比論點分。數字越高越優先。</p>
+            <ol>
+              <li>先比勝場數，勝場多者出循環。</li>
+              <li>勝場相同時，比評分單張數，單勝張數多者出循環。</li>
+              <li>評分單張數相同時，比論點單張數，拿到較多裁判論點單者出循環。</li>
+            </ol>
           </div>
           <div id="cycleResult" class="cycle-result"></div>
         </section>
@@ -244,6 +265,6 @@
       </tr>
     </template>
 
-    <script src="app.js?v=20260608-2"></script>
+    <script src="app.js?v=20260608-5"></script>
   </body>
 </html>

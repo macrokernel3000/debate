@@ -10,6 +10,10 @@ const SIDE_LABELS = {
 const SCORE_FIELDS = ["speech", "question", "defense"];
 const MIN_SCORE = -10;
 const MAX_SCORE = 100;
+const PHOTO_MAX_SIZE = 1600;
+const PHOTO_QUALITY = 0.82;
+
+let currentBallotPhoto = null;
 
 const els = {
   matchPeriod: document.querySelector("#matchPeriod"),
@@ -18,6 +22,10 @@ const els = {
   matchDate: document.querySelector("#matchDate"),
   matchJudge: document.querySelector("#matchJudge"),
   matchRecorder: document.querySelector("#matchRecorder"),
+  ballotPhotoInput: document.querySelector("#ballotPhotoInput"),
+  ballotPhotoStatus: document.querySelector("#ballotPhotoStatus"),
+  ballotPhotoPreview: document.querySelector("#ballotPhotoPreview"),
+  removeBallotPhoto: document.querySelector("#removeBallotPhoto"),
   cloudEndpoint: document.querySelector("#cloudEndpoint"),
   cloudStatus: document.querySelector("#cloudStatus"),
   saveCloudEndpoint: document.querySelector("#saveCloudEndpoint"),
@@ -29,8 +37,6 @@ const els = {
   negativeRows: document.querySelector("#negativeRows"),
   affirmativeTotal: document.querySelector("#affirmativeTotal"),
   negativeTotal: document.querySelector("#negativeTotal"),
-  affirmativeBadge: document.querySelector("#affirmativeBadge"),
-  negativeBadge: document.querySelector("#negativeBadge"),
   winnerText: document.querySelector("#winnerText"),
   bestPlayers: document.querySelector("#bestPlayers"),
   matchRankings: document.querySelector("#matchRankings"),
@@ -40,6 +46,7 @@ const els = {
   resetForm: document.querySelector("#resetForm"),
   exportRecords: document.querySelector("#exportRecords"),
   exportSpreadsheet: document.querySelector("#exportSpreadsheet"),
+  importSpreadsheet: document.querySelector("#importSpreadsheet"),
   clearRecords: document.querySelector("#clearRecords"),
   matchSummaryList: document.querySelector("#matchSummaryList"),
   matchSummaryCount: document.querySelector("#matchSummaryCount"),
@@ -234,34 +241,6 @@ function calculate() {
   renderRankingList(els.matchRankings, rankedPlayers.slice(0, 6), (player) =>
     `${player.name}（${player.sideLabel}，${formatNumber(player.total)}）`
   );
-  updateBadges(totals.affirmative, totals.negative);
-}
-
-function updateBadges(affirmativeTotal, negativeTotal) {
-  const affirmativeCard = document.querySelector(".side-summary.affirmative");
-  const negativeCard = document.querySelector(".side-summary.negative");
-  affirmativeCard.classList.remove("is-leading");
-  negativeCard.classList.remove("is-leading");
-
-  els.affirmativeBadge.textContent = "待輸入";
-  els.negativeBadge.textContent = "待輸入";
-
-  if (affirmativeTotal === 0 && negativeTotal === 0) return;
-  if (affirmativeTotal === negativeTotal) {
-    els.affirmativeBadge.textContent = "平手";
-    els.negativeBadge.textContent = "平手";
-    return;
-  }
-
-  if (affirmativeTotal > negativeTotal) {
-    affirmativeCard.classList.add("is-leading");
-    els.affirmativeBadge.textContent = "領先";
-    els.negativeBadge.textContent = "落後";
-  } else {
-    negativeCard.classList.add("is-leading");
-    els.negativeBadge.textContent = "領先";
-    els.affirmativeBadge.textContent = "落後";
-  }
 }
 
 function readRecords() {
@@ -302,6 +281,7 @@ function buildMatchRecord() {
     judge: els.matchJudge.value.trim(),
     recorder: els.matchRecorder.value.trim(),
     note: "",
+    ballotPhoto: currentBallotPhoto ? { ...currentBallotPhoto } : null,
     createdAt: new Date().toISOString(),
     teams,
     players,
@@ -380,6 +360,7 @@ function resetForm() {
     input.value = "";
   });
   els.matchDate.value = new Date().toISOString().slice(0, 10);
+  setBallotPhoto(null);
   calculate();
   flashStatus("已清空輸入");
 }
@@ -411,6 +392,44 @@ function exportSpreadsheet() {
   flashStatus("已匯出試算表");
 }
 
+async function importSpreadsheet() {
+  const file = els.importSpreadsheet.files?.[0];
+  if (!file) return;
+
+  try {
+    const text = await file.text();
+    const importedRecords = buildRecordsFromSpreadsheetCsv(text);
+    if (!importedRecords.length) {
+      flashStatus("沒有可匯入的紀錄");
+      return;
+    }
+
+    const records = readRecords();
+    const duplicateCount = importedRecords.filter((record) => {
+      const key = getJudgeBallotKey(record);
+      return key && records.some((existing) => getJudgeBallotKey(existing) === key);
+    }).length;
+
+    if (duplicateCount) {
+      const confirmed = window.confirm(
+        `這份試算表有 ${duplicateCount} 張裁判表已經存在。\n\n` +
+        `是否要用匯入資料更新舊資料？`
+      );
+      if (!confirmed) {
+        flashStatus("已取消匯入");
+        return;
+      }
+    }
+
+    writeRecords(mergeImportedRecords(records, importedRecords));
+    flashStatus(`已匯入 ${importedRecords.length} 張裁判表`);
+  } catch (error) {
+    flashStatus("匯入失敗，請確認是本系統匯出的 CSV");
+  } finally {
+    els.importSpreadsheet.value = "";
+  }
+}
+
 function getCloudEndpoint() {
   if (!CLOUD_ENABLED) return "";
   return localStorage.getItem(CLOUD_ENDPOINT_KEY) || DEFAULT_CLOUD_ENDPOINT;
@@ -426,6 +445,186 @@ function saveCloudEndpoint() {
     flashStatus("已清除雲端連線");
   }
   updateCloudStatus();
+}
+
+function buildRecordsFromSpreadsheetCsv(text) {
+  const table = parseCsv(text);
+  if (table.length < 2) return [];
+  const headers = table[0].map((header) => String(header || "").replace(/^\uFEFF/, "").trim());
+  const headerIndex = new Map(headers.map((header, index) => [header, index]));
+  const requiredHeaders = ["盃賽名稱", "時段", "會場", "方別", "選手序號", "選手姓名"];
+  if (!requiredHeaders.every((header) => headerIndex.has(header))) return [];
+
+  const grouped = new Map();
+  table.slice(1).forEach((row) => {
+    if (!row.some((value) => String(value || "").trim())) return;
+    const get = (header) => row[headerIndex.get(header)] ?? "";
+    const competitionName = stringValue(get("盃賽名稱")) || "未命名盃賽";
+    const period = integerOrBlank(get("時段"));
+    const venue = integerOrBlank(get("會場"));
+    const matchDate = stringValue(get("日期"));
+    const judge = stringValue(get("裁判"));
+    const recorder = stringValue(get("記錄員"));
+    const affirmativeTeam = stringValue(get("正方隊伍")) || "正方";
+    const negativeTeam = stringValue(get("反方隊伍")) || "反方";
+    const key = [
+      competitionName,
+      period,
+      venue,
+      matchDate,
+      judge,
+      recorder,
+      affirmativeTeam,
+      negativeTeam,
+    ].join("｜");
+
+    const record = grouped.get(key) || {
+      id: crypto.randomUUID(),
+      competitionName,
+      period,
+      venue,
+      matchDate,
+      judge,
+      recorder,
+      note: "",
+      ballotPhoto: null,
+      importedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      teams: {
+        affirmative: affirmativeTeam,
+        negative: negativeTeam,
+      },
+      players: {
+        affirmative: [],
+        negative: [],
+      },
+      argumentScores: {
+        affirmative: numberValue(get("正方論點分")),
+        negative: numberValue(get("反方論點分")),
+      },
+      totals: {
+        affirmative: numberValue(get("正方總分")),
+        negative: numberValue(get("反方總分")),
+      },
+      winner: stringValue(get("勝方")),
+      bestPlayers: [],
+    };
+
+    const side = sideFromLabel(get("方別"));
+    if (side) {
+      const playerIndex = Math.max(0, (Number.parseInt(get("選手序號"), 10) || record.players[side].length + 1) - 1);
+      record.players[side][playerIndex] = {
+        name: stringValue(get("選手姓名")),
+        speech: numberValue(get("申論")),
+        question: numberValue(get("質詢")),
+        defense: numberValue(get("答辯")),
+        total: numberValue(get("個人總分")),
+        note: stringValue(get("選手備註")),
+      };
+    }
+
+    grouped.set(key, record);
+  });
+
+  return [...grouped.values()].map((record) => {
+    SIDES.forEach((side) => {
+      record.players[side] = record.players[side].filter(Boolean);
+      record.players[side].forEach((player) => {
+        if (!Number.isFinite(player.total) || player.total === 0) {
+          player.total = player.speech + player.question + player.defense;
+        }
+      });
+      const calculatedTotal = record.players[side].reduce((sum, player) => sum + player.total, 0)
+        + numberValue(record.argumentScores[side]);
+      if (!Number.isFinite(record.totals[side]) || record.totals[side] === 0) {
+        record.totals[side] = calculatedTotal;
+      }
+    });
+    record.winner = record.winner || determineWinner(record.totals.affirmative, record.totals.negative);
+    record.bestPlayers = getBestPlayers(record.players, record.teams);
+    return record;
+  });
+}
+
+function mergeImportedRecords(records, importedRecords) {
+  const merged = [...records];
+  importedRecords.forEach((record) => {
+    const key = getJudgeBallotKey(record);
+    const duplicateIndex = key
+      ? merged.findIndex((existing) => getJudgeBallotKey(existing) === key)
+      : -1;
+
+    if (duplicateIndex >= 0) {
+      record.id = merged[duplicateIndex].id;
+      record.replacedAt = new Date().toISOString();
+      merged.splice(duplicateIndex, 1);
+    }
+    merged.unshift(record);
+  });
+  return merged;
+}
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let quoted = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const nextChar = text[index + 1];
+
+    if (quoted) {
+      if (char === '"' && nextChar === '"') {
+        cell += '"';
+        index += 1;
+      } else if (char === '"') {
+        quoted = false;
+      } else {
+        cell += char;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      quoted = true;
+    } else if (char === ",") {
+      row.push(cell);
+      cell = "";
+    } else if (char === "\n") {
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = "";
+    } else if (char !== "\r") {
+      cell += char;
+    }
+  }
+
+  row.push(cell);
+  rows.push(row);
+  return rows;
+}
+
+function stringValue(value) {
+  return String(value ?? "").trim();
+}
+
+function numberValue(value) {
+  const number = Number.parseFloat(value);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function integerOrBlank(value) {
+  const number = Number.parseInt(value, 10);
+  return Number.isFinite(number) ? number : "";
+}
+
+function sideFromLabel(label) {
+  const text = stringValue(label);
+  if (text === "正方" || text === "affirmative") return "affirmative";
+  if (text === "反方" || text === "negative") return "negative";
+  return "";
 }
 
 function updateCloudStatus() {
@@ -508,6 +707,7 @@ function renderRecords() {
     const bestPlayers = record.bestPlayers?.length
       ? record.bestPlayers
       : getBestPlayers(record.players, record.teams);
+    const photoHtml = buildRecordPhotoHtml(record);
 
     article.innerHTML = `
       <div class="record-top">
@@ -533,11 +733,20 @@ function renderRecords() {
         </div>
       </div>
       <p class="record-best">單場最佳：${escapeHtml(formatBestPlayers(bestPlayers))}</p>
+      ${photoHtml}
     `;
     article.querySelector("[data-export]").addEventListener("click", () => exportRecord(record.id));
     article.querySelector("[data-delete]").addEventListener("click", () => deleteRecord(record.id));
     els.recordsList.append(article);
   });
+}
+
+function buildRecordPhotoHtml(record) {
+  if (!record.ballotPhoto?.dataUrl) return "";
+  return `<div class="record-photo">
+    <img src="${escapeHtml(record.ballotPhoto.dataUrl)}" alt="評分單照片" loading="lazy" />
+    <a class="small-action" href="${escapeHtml(record.ballotPhoto.dataUrl)}" target="_blank" rel="noreferrer">查看照片</a>
+  </div>`;
 }
 
 function getMatchSummaries(records) {
@@ -561,12 +770,21 @@ function getMatchSummaries(records) {
       judges: [],
       affirmativeArgumentTotal: 0,
       negativeArgumentTotal: 0,
+      affirmativeArgumentVotes: 0,
+      negativeArgumentVotes: 0,
     };
 
     existing.ballots += 1;
     if (record.judge) existing.judges.push(record.judge);
-    existing.affirmativeArgumentTotal += Number(record.argumentScores?.affirmative) || 0;
-    existing.negativeArgumentTotal += Number(record.argumentScores?.negative) || 0;
+    const affirmativeArgument = Number(record.argumentScores?.affirmative) || 0;
+    const negativeArgument = Number(record.argumentScores?.negative) || 0;
+    existing.affirmativeArgumentTotal += affirmativeArgument;
+    existing.negativeArgumentTotal += negativeArgument;
+    if (affirmativeArgument > negativeArgument) {
+      existing.affirmativeArgumentVotes += 1;
+    } else if (negativeArgument > affirmativeArgument) {
+      existing.negativeArgumentVotes += 1;
+    }
 
     if (record.winner === "正方勝") {
       existing.affirmativeVotes += 1;
@@ -662,12 +880,12 @@ function calculateCycle() {
     addCycleTeamResult(teams, summary.affirmativeTeam, {
       matchWin: getSummaryWinner(summary) === "正方勝" ? 1 : 0,
       ballotWins: summary.affirmativeVotes,
-      argumentPoints: summary.affirmativeArgumentTotal,
+      argumentPoints: summary.affirmativeArgumentVotes,
     });
     addCycleTeamResult(teams, summary.negativeTeam, {
       matchWin: getSummaryWinner(summary) === "反方勝" ? 1 : 0,
       ballotWins: summary.negativeVotes,
-      argumentPoints: summary.negativeArgumentTotal,
+      argumentPoints: summary.negativeArgumentVotes,
     });
   });
 
@@ -713,7 +931,7 @@ function renderCycleResult(ranking) {
           <th>隊伍</th>
           <th>勝場數</th>
           <th>評分單張數</th>
-          <th>論點分</th>
+          <th>論點單張數</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -826,6 +1044,22 @@ function buildReportHtml(records) {
       .box p { margin: 0; color: #667085; font-size: 13px; font-weight: 700; }
       .box strong { display: block; margin-top: 4px; font-size: 24px; }
       .winner { background: #e8f5ef; color: #11724d; }
+      .ballot-photo {
+        margin-top: 14px;
+        border: 1px solid #d9e1ea;
+        border-radius: 8px;
+        padding: 12px;
+        background: #f8fafc;
+      }
+      .ballot-photo p { margin: 0 0 8px; color: #667085; font-weight: 800; }
+      .ballot-photo img {
+        display: block;
+        width: 100%;
+        max-height: 520px;
+        object-fit: contain;
+        border-radius: 6px;
+        background: #fff;
+      }
       table { width: 100%; margin-top: 12px; border-collapse: collapse; table-layout: fixed; }
       caption { margin: 12px 0 6px; text-align: left; font-weight: 800; }
       th, td { border: 1px solid #d9e1ea; padding: 8px; text-align: left; vertical-align: top; }
@@ -918,7 +1152,17 @@ function buildReportRecordHtml(record) {
     </div>
     ${buildReportTeamTable(record, "affirmative")}
     ${buildReportTeamTable(record, "negative")}
+    ${buildReportPhotoHtml(record)}
   </article>`;
+}
+
+function buildReportPhotoHtml(record) {
+  if (!record.ballotPhoto?.dataUrl) return "";
+  const name = record.ballotPhoto.name ? `｜${record.ballotPhoto.name}` : "";
+  return `<div class="ballot-photo">
+    <p>評分單照片${escapeHtml(name)}</p>
+    <img src="${escapeHtml(record.ballotPhoto.dataUrl)}" alt="評分單照片" />
+  </div>`;
 }
 
 function buildReportRankingHtml(record) {
@@ -989,6 +1233,7 @@ function buildSpreadsheetCsv(records) {
     "正方總分",
     "反方總分",
     "單場最佳",
+    "評分單照片",
     "單場排名",
     "單場名次分",
     "方別",
@@ -1030,6 +1275,7 @@ function buildSpreadsheetCsv(records) {
           record.totals?.affirmative ?? 0,
           record.totals?.negative ?? 0,
           formatBestPlayers(record.bestPlayers?.length ? record.bestPlayers : getBestPlayers(record.players, record.teams)),
+          record.ballotPhoto?.dataUrl ? record.ballotPhoto.name || "有" : "無",
           rankInfo?.rank ?? "",
           rankInfo?.rankPoints ?? "",
           SIDE_LABELS[side],
@@ -1062,6 +1308,78 @@ function downloadTextFile(text, filename, type) {
   link.download = filename;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+async function handleBallotPhotoChange() {
+  const file = els.ballotPhotoInput.files?.[0];
+  if (!file) {
+    setBallotPhoto(null);
+    return;
+  }
+
+  if (!file.type.startsWith("image/")) {
+    setBallotPhoto(null);
+    flashStatus("請選擇圖片檔");
+    return;
+  }
+
+  els.ballotPhotoStatus.textContent = "照片處理中";
+  els.removeBallotPhoto.disabled = true;
+
+  try {
+    const dataUrl = await resizeImageFile(file);
+    setBallotPhoto({
+      name: file.name || "評分單照片",
+      type: "image/jpeg",
+      dataUrl,
+      savedAt: new Date().toISOString(),
+    });
+    flashStatus("已附加評分單照片");
+  } catch {
+    setBallotPhoto(null);
+    flashStatus("照片讀取失敗，請換一張再試");
+  }
+}
+
+function resizeImageFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = () => {
+      const image = new Image();
+      image.onerror = reject;
+      image.onload = () => {
+        const scale = Math.min(1, PHOTO_MAX_SIZE / Math.max(image.width, image.height));
+        const width = Math.max(1, Math.round(image.width * scale));
+        const height = Math.max(1, Math.round(image.height * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext("2d");
+        context.drawImage(image, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", PHOTO_QUALITY));
+      };
+      image.src = String(reader.result || "");
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function setBallotPhoto(photo) {
+  currentBallotPhoto = photo;
+  els.ballotPhotoInput.value = "";
+  els.removeBallotPhoto.disabled = !photo;
+
+  if (!photo?.dataUrl) {
+    els.ballotPhotoStatus.textContent = "尚未附加照片";
+    els.ballotPhotoPreview.classList.add("is-empty");
+    els.ballotPhotoPreview.innerHTML = "<span>照片預覽</span>";
+    return;
+  }
+
+  els.ballotPhotoStatus.textContent = photo.name || "已附加照片";
+  els.ballotPhotoPreview.classList.remove("is-empty");
+  els.ballotPhotoPreview.innerHTML = `<img src="${escapeHtml(photo.dataUrl)}" alt="評分單照片預覽" />`;
 }
 
 function getSeasonRankings(records) {
@@ -1152,10 +1470,16 @@ function init() {
     });
   });
   els.saveMatch.addEventListener("click", saveMatch);
+  els.ballotPhotoInput.addEventListener("change", handleBallotPhotoChange);
+  els.removeBallotPhoto.addEventListener("click", () => {
+    setBallotPhoto(null);
+    flashStatus("已移除評分單照片");
+  });
   els.saveCloudEndpoint.addEventListener("click", saveCloudEndpoint);
   els.resetForm.addEventListener("click", resetForm);
   els.exportRecords.addEventListener("click", exportRecords);
   els.exportSpreadsheet.addEventListener("click", exportSpreadsheet);
+  els.importSpreadsheet.addEventListener("change", importSpreadsheet);
   els.clearRecords.addEventListener("click", clearRecords);
   els.tabButtons.forEach((button) => {
     button.addEventListener("click", () => switchView(button.dataset.view));
