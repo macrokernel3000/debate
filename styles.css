@@ -121,19 +121,100 @@ input:focus {
 .best-panel,
 .teams,
 .actions,
+.match-summary-section,
 .records-section {
   margin-top: 16px;
 }
 
+.app-tabs {
+  display: flex;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.tab-button {
+  border-color: #cbd7e4;
+  background: rgba(255, 255, 255, 0.76);
+  font-weight: 800;
+}
+
+.tab-button.is-active {
+  border-color: var(--blue);
+  color: #fff;
+  background: var(--blue);
+}
+
 .match-meta {
   display: grid;
-  grid-template-columns: 1.1fr 1fr 170px 0.8fr 0.8fr;
+  grid-template-columns: 1.15fr 90px 90px 170px 0.8fr 0.8fr;
   gap: 12px;
   padding: 16px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.78);
   box-shadow: var(--shadow);
+}
+
+.cycle-panel {
+  margin-top: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: var(--shadow);
+}
+
+.cycle-controls {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr 1fr 1fr 1fr;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+select {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 8px 10px;
+  color: var(--ink);
+  background: #fff;
+  font: inherit;
+}
+
+.cycle-rule {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+  background: #fbfcfe;
+}
+
+.cycle-rule strong,
+.cycle-rule p {
+  margin: 0;
+}
+
+.cycle-rule strong {
+  color: var(--green);
+}
+
+.cycle-rule p {
+  color: var(--muted);
+}
+
+.cycle-result {
+  padding: 16px;
+}
+
+.cycle-result table {
+  min-width: 680px;
+}
+
+.cycle-result tr.is-winner td {
+  color: var(--green);
+  background: var(--green-soft);
+  font-weight: 800;
 }
 
 .is-hidden {
@@ -394,6 +475,7 @@ td input[data-field="defense"] {
   align-items: center;
 }
 
+.match-summary-section,
 .records-section {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -421,6 +503,12 @@ td input[data-field="defense"] {
   padding: 16px;
 }
 
+.match-summary-list {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+}
+
 .empty-records {
   margin: 0;
   color: var(--muted);
@@ -431,6 +519,56 @@ td input[data-field="defense"] {
   border-radius: 8px;
   padding: 14px;
   background: #fff;
+}
+
+.match-summary {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 1.4fr;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: #fff;
+}
+
+.match-summary h3 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.summary-votes {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+}
+
+.summary-votes div {
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--band);
+}
+
+.summary-votes div.is-winner {
+  color: var(--green);
+  background: var(--green-soft);
+}
+
+.summary-votes p,
+.summary-votes strong,
+.summary-votes span {
+  display: block;
+  margin: 0;
+}
+
+.summary-votes p,
+.summary-votes span {
+  font-size: 13px;
+  color: inherit;
+}
+
+.summary-votes strong {
+  margin: 3px 0;
+  font-size: 24px;
 }
 
 .record-top {
@@ -516,8 +654,11 @@ td input[data-field="defense"] {
 
   .match-meta,
   .cloud-panel,
+  .cycle-controls,
   .scoreboard,
   .best-panel,
+  .match-summary,
+  .summary-votes,
   .record-result {
     grid-template-columns: 1fr;
   }

@@ -16,14 +16,24 @@
         <div class="save-status" id="saveStatus">資料儲存在此瀏覽器</div>
       </header>
 
+      <nav class="app-tabs" aria-label="功能切換">
+        <button class="tab-button is-active" type="button" data-view="scoreView">計分紀錄</button>
+        <button class="tab-button" type="button" data-view="cycleView">循環計算器</button>
+      </nav>
+
+      <section id="scoreView" class="app-view">
       <section class="match-meta" aria-label="比賽資訊">
         <label>
           盃賽名稱
           <input id="competitionName" type="text" placeholder="例：某某盃辯論賽" />
         </label>
         <label>
-          場次名稱
-          <input id="matchName" type="text" placeholder="例：初賽第一場" />
+          時段
+          <input id="matchPeriod" type="number" min="1" max="8" step="1" inputmode="numeric" data-integer-range="true" placeholder="1-8" />
+        </label>
+        <label>
+          會場
+          <input id="matchVenue" type="number" min="1" max="20" step="1" inputmode="numeric" data-integer-range="true" placeholder="1-20" />
         </label>
         <label>
           日期
@@ -94,7 +104,7 @@
             <input id="affirmativeTeam" type="text" placeholder="學校或隊伍名稱" />
             <label class="side-argument">
               論點分
-              <input id="affirmativeArgument" type="number" min="0" step="1" inputmode="numeric" />
+              <input id="affirmativeArgument" type="number" min="-10" max="100" step="1" inputmode="numeric" />
             </label>
           </div>
           <div class="table-wrap">
@@ -128,7 +138,7 @@
             <input id="negativeTeam" type="text" placeholder="學校或隊伍名稱" />
             <label class="side-argument">
               論點分
-              <input id="negativeArgument" type="number" min="0" step="1" inputmode="numeric" />
+              <input id="negativeArgument" type="number" min="-10" max="100" step="1" inputmode="numeric" />
             </label>
           </div>
           <div class="table-wrap">
@@ -165,6 +175,14 @@
         <button class="danger" id="clearRecords" type="button">刪除全部紀錄</button>
       </section>
 
+      <section class="match-summary-section" aria-label="場次勝負統計">
+        <div class="section-heading">
+          <h2>場次勝負統計</h2>
+          <p id="matchSummaryCount">0 場</p>
+        </div>
+        <div id="matchSummaryList" class="match-summary-list"></div>
+      </section>
+
       <section class="records-section" aria-label="歷史紀錄">
         <div class="section-heading">
           <h2>比賽紀錄</h2>
@@ -172,14 +190,55 @@
         </div>
         <div id="recordsList" class="records-list"></div>
       </section>
+      </section>
+
+      <section id="cycleView" class="app-view is-hidden" aria-label="循環計算器">
+        <section class="cycle-panel">
+          <div class="section-heading">
+            <h2>循環計算器</h2>
+            <p id="cycleStatus">選擇已儲存的場次</p>
+          </div>
+          <div class="cycle-controls">
+            <label>
+              循環類型
+              <select id="cycleType">
+                <option value="single">單淘（一場定生死）</option>
+                <option value="mutual">互咬（兩場交換持方）</option>
+                <option value="triangle">三角循環（三間學校）</option>
+              </select>
+            </label>
+            <label>
+              盃賽名稱
+              <select id="cycleCompetition"></select>
+            </label>
+            <label>
+              場次一
+              <select class="cycle-match-select" id="cycleMatchA"></select>
+            </label>
+            <label>
+              場次二
+              <select class="cycle-match-select" id="cycleMatchB"></select>
+            </label>
+            <label>
+              場次三
+              <select class="cycle-match-select" id="cycleMatchC"></select>
+            </label>
+          </div>
+          <div class="cycle-rule">
+            <strong>出循環規則</strong>
+            <p>先比勝場數；勝場相同，比評分單張數；評分單張數相同，比論點分。數字越高越優先。</p>
+          </div>
+          <div id="cycleResult" class="cycle-result"></div>
+        </section>
+      </section>
     </main>
 
     <template id="playerRowTemplate">
       <tr>
         <td><input data-field="name" type="text" placeholder="姓名" /></td>
-        <td><input data-field="speech" type="number" min="0" step="1" inputmode="numeric" /></td>
-        <td><input data-field="question" type="number" min="0" step="1" inputmode="numeric" /></td>
-        <td><input data-field="defense" type="number" min="0" step="1" inputmode="numeric" /></td>
+        <td><input data-field="speech" type="number" min="-10" max="100" step="1" inputmode="numeric" /></td>
+        <td><input data-field="question" type="number" min="-10" max="100" step="1" inputmode="numeric" /></td>
+        <td><input data-field="defense" type="number" min="-10" max="100" step="1" inputmode="numeric" /></td>
         <td><output data-field="total">0</output></td>
         <td><input data-field="note" type="text" placeholder="備註" /></td>
       </tr>
