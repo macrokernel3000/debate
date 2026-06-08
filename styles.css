@@ -440,6 +440,10 @@ label.import-action {
   box-shadow: var(--shadow);
 }
 
+.best-panel.season-only {
+  grid-template-columns: 1fr;
+}
+
 .best-panel article {
   min-width: 0;
 }
@@ -676,6 +680,19 @@ td input[data-field="defense"] {
 .match-summary h3 {
   margin: 0;
   font-size: 17px;
+}
+
+.summary-scoreline,
+.summary-best-speaker {
+  margin: 8px 0 0;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.summary-best-speaker {
+  color: var(--green);
 }
 
 .summary-votes {
@@ -1054,4 +1071,228 @@ button.is-saved {
 .new-player-prompt .muted-action {
   border-color: #d8d2c5;
   color: #746f66;
+}
+
+.tab-groups {
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+
+.tab-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid #d7e0eb;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.player-tab-group {
+  border-color: #d7caa0;
+  background: rgba(255, 250, 234, 0.78);
+}
+
+.tab-group-label {
+  padding: 0 6px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.player-growth-panel {
+  margin-top: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.player-entry-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 16px;
+  padding: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.player-entry-grid.single {
+  grid-template-columns: 1fr;
+}
+
+.player-card,
+.growth-chart-card,
+.player-analysis-card,
+.player-table-card,
+.player-rank-card {
+  border: 1px solid #dbe4ee;
+  border-radius: 10px;
+  padding: 16px;
+  background: #fff;
+}
+
+.player-card h3,
+.player-analysis-card h3 {
+  margin: 0 0 12px;
+}
+
+.player-form-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.player-form-grid.compact {
+  grid-template-columns: 1.3fr 1fr 1fr;
+}
+
+.growth-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  padding: 0 16px 16px;
+}
+
+.growth-summary-grid article {
+  border: 1px solid #dbe4ee;
+  border-radius: 10px;
+  padding: 14px;
+  background: var(--blue-soft);
+}
+
+.growth-summary-grid p {
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.growth-summary-grid strong {
+  font-size: 19px;
+}
+
+.growth-chart-card,
+.player-analysis-card,
+.player-table-card,
+.player-rank-card {
+  margin: 0 16px 16px;
+}
+
+.compact-heading {
+  padding: 0 0 12px;
+}
+
+.trend-chart {
+  display: grid;
+  place-items: center;
+  min-height: 280px;
+  border: 1px dashed #c7d4e3;
+  border-radius: 10px;
+  color: var(--muted);
+  background: #f8fafc;
+  overflow: hidden;
+}
+
+.trend-chart svg {
+  width: 100%;
+  height: auto;
+}
+
+.chart-axis {
+  stroke: #9fb0c3;
+  stroke-width: 1.5;
+}
+
+.trend-line {
+  fill: none;
+  stroke: var(--blue);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.trend-chart circle {
+  fill: var(--blue);
+}
+
+.chart-label {
+  fill: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.player-records-table {
+  overflow-x: auto;
+}
+
+.player-records-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.player-records-table th,
+.player-records-table td {
+  border-bottom: 1px solid var(--line);
+  padding: 10px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.rank-section-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.rank-section-grid article {
+  border: 1px solid #dbe4ee;
+  border-radius: 10px;
+  padding: 14px;
+  background: #fbfcfe;
+}
+
+.rank-section-grid h3 {
+  margin: 0 0 10px;
+  font-size: 16px;
+}
+
+.ranking-table {
+  overflow-x: auto;
+}
+
+.ranking-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ranking-table th,
+.ranking-table td {
+  border-bottom: 1px solid var(--line);
+  padding: 8px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.ranking-table th {
+  color: var(--muted);
+  font-size: 13px;
+  background: #f3f7fb;
+}
+
+.empty-note {
+  margin: 0;
+  color: var(--muted);
+}
+
+@media (max-width: 860px) {
+  .player-entry-grid,
+  .growth-summary-grid,
+  .player-form-grid,
+  .player-form-grid.compact,
+  .rank-section-grid {
+    grid-template-columns: 1fr;
+  }
 }

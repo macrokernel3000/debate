@@ -1,5 +1,6 @@
 const STORAGE_KEY = "yunan-cup-score-records";
 const ROSTER_STORAGE_KEY = "yunan-cup-team-rosters";
+const PLAYER_GROWTH_STORAGE_KEY = "yunan-cup-player-growth-records";
 const COMPETITION_MARKER_TEAM = "__COMPETITION_MARKER__";
 const CLOUD_ENDPOINT_KEY = "yunan-cup-cloud-endpoint";
 const CLOUD_ENABLED = false;
@@ -36,7 +37,10 @@ const els = {
   matchRecorder: document.querySelector("#matchRecorder"),
   judgeNameOptions: document.querySelector("#judgeNameOptions"),
   recorderNameOptions: document.querySelector("#recorderNameOptions"),
+  competitionNameOptions: document.querySelector("#competitionNameOptions"),
   playerNameOptions: document.querySelector("#playerNameOptions"),
+  affirmativePlayerNameOptions: document.querySelector("#affirmativePlayerNameOptions"),
+  negativePlayerNameOptions: document.querySelector("#negativePlayerNameOptions"),
   teamNameOptions: document.querySelector("#teamNameOptions"),
   ballotPhotoInput: document.querySelector("#ballotPhotoInput"),
   ballotPhotoStatus: document.querySelector("#ballotPhotoStatus"),
@@ -70,6 +74,8 @@ const els = {
   spreadsheetTextPanel: document.querySelector("#spreadsheetTextPanel"),
   spreadsheetTextOutput: document.querySelector("#spreadsheetTextOutput"),
   importSpreadsheet: document.querySelector("#importSpreadsheet"),
+  exportRosterData: document.querySelector("#exportRosterData"),
+  importRosterSpreadsheet: document.querySelector("#importRosterSpreadsheet"),
   clearRecords: document.querySelector("#clearRecords"),
   matchSummaryList: document.querySelector("#matchSummaryList"),
   matchSummaryCount: document.querySelector("#matchSummaryCount"),
@@ -95,6 +101,35 @@ const els = {
   affirmativeNewTeamPrompt: document.querySelector("#affirmativeNewTeamPrompt"),
   negativeNewTeamPrompt: document.querySelector("#negativeNewTeamPrompt"),
   rosterList: document.querySelector("#rosterList"),
+  playerSelfName: document.querySelector("#playerSelfName"),
+  playerSelfCompetition: document.querySelector("#playerSelfCompetition"),
+  playerSelfDate: document.querySelector("#playerSelfDate"),
+  playerSelfMatch: document.querySelector("#playerSelfMatch"),
+  playerSelfSpeech: document.querySelector("#playerSelfSpeech"),
+  playerSelfQuestion: document.querySelector("#playerSelfQuestion"),
+  playerSelfDefense: document.querySelector("#playerSelfDefense"),
+  playerSelfNote: document.querySelector("#playerSelfNote"),
+  savePlayerSelfRecord: document.querySelector("#savePlayerSelfRecord"),
+  playerGrowthName: document.querySelector("#playerGrowthName"),
+  playerGrowthMetric: document.querySelector("#playerGrowthMetric"),
+  playerGrowthCompetition: document.querySelector("#playerGrowthCompetition"),
+  renderPlayerGrowth: document.querySelector("#renderPlayerGrowth"),
+  rankingCompetition: document.querySelector("#rankingCompetition"),
+  rankingMinAppearances: document.querySelector("#rankingMinAppearances"),
+  rankingBestCount: document.querySelector("#rankingBestCount"),
+  rankSumLeaders: document.querySelector("#rankSumLeaders"),
+  speechLeaders: document.querySelector("#speechLeaders"),
+  questionLeaders: document.querySelector("#questionLeaders"),
+  defenseLeaders: document.querySelector("#defenseLeaders"),
+  playerGameCount: document.querySelector("#playerGameCount"),
+  playerLatestScore: document.querySelector("#playerLatestScore"),
+  playerTrendText: document.querySelector("#playerTrendText"),
+  playerStageText: document.querySelector("#playerStageText"),
+  playerChartCaption: document.querySelector("#playerChartCaption"),
+  playerTrendChart: document.querySelector("#playerTrendChart"),
+  playerInsightText: document.querySelector("#playerInsightText"),
+  playerRecordCount: document.querySelector("#playerRecordCount"),
+  playerRecordsTable: document.querySelector("#playerRecordsTable"),
   tabButtons: document.querySelectorAll(".tab-button"),
   appViews: document.querySelectorAll(".app-view"),
   cycleType: document.querySelector("#cycleType"),
@@ -197,6 +232,9 @@ function createRows() {
           markDirty();
         });
         if (input.dataset.field === "name") {
+          input.setAttribute("list", `${side}PlayerNameOptions`);
+          input.addEventListener("focus", () => renderSidePlayerSuggestions(side));
+          input.addEventListener("input", () => renderSidePlayerSuggestions(side));
           input.addEventListener("blur", () => checkUnknownPlayerForRoster(side, input));
         }
       });
@@ -252,6 +290,7 @@ function formatBestPlayers(bestPlayers) {
 }
 
 function renderRankingList(list, players, formatter) {
+  if (!list) return;
   list.innerHTML = "";
   if (!players.length) {
     const item = document.createElement("li");
@@ -321,9 +360,11 @@ function calculate() {
   };
   const rankedPlayers = getRankedMatchPlayers(players, teams);
   if (els.bestPlayers) els.bestPlayers.textContent = formatBestPlayers(getBestPlayers(players, teams));
-  renderRankingList(els.matchRankings, rankedPlayers.slice(0, 6), (player) =>
-    `${player.name}（${player.sideLabel}，${formatNumber(player.total)}）`
-  );
+  if (els.matchRankings) {
+    renderRankingList(els.matchRankings, rankedPlayers.slice(0, 6), (player) =>
+      `${player.name}（${player.sideLabel}，${formatNumber(player.total)}）`
+    );
+  }
 }
 
 function readRecords() {
@@ -341,6 +382,9 @@ function writeRecords(records) {
   renderRecords();
   renderSeasonRankings(records);
   renderCycleControls(records);
+  renderPlayerGrowthOptions();
+  renderPlayerGrowth();
+  renderTournamentRankingOptions(records);
 }
 
 function renderNameSuggestions(records = readRecords()) {
@@ -348,26 +392,51 @@ function renderNameSuggestions(records = readRecords()) {
   const recorders = new Set();
   const players = new Set();
   const teams = new Set();
+  const competitions = new Set();
+  const activeCompetition = normalizeCompetitionName(els.competitionName?.value || els.rosterCompetition?.value || "");
 
   records.forEach((record) => {
     addSuggestion(judges, record.judge);
     addSuggestion(recorders, record.recorder);
+    addSuggestion(competitions, record.competitionName);
     SIDES.forEach((side) => {
-      addSuggestion(teams, record.teams?.[side]);
+      if (!activeCompetition || normalizeCompetitionName(record.competitionName) === activeCompetition) {
+        addSuggestion(teams, record.teams?.[side]);
+      }
       (record.players?.[side] || []).forEach((player) => addSuggestion(players, player.name));
     });
   });
 
   readRosters().forEach((roster) => {
+    addSuggestion(competitions, roster.competitionName);
     if (isCompetitionMarker(roster)) return;
-    addSuggestion(teams, roster.team);
+    if (!activeCompetition || normalizeCompetitionName(roster.competitionName) === activeCompetition) {
+      addSuggestion(teams, roster.team);
+    }
     (roster.players || []).forEach((player) => addSuggestion(players, player));
   });
 
   fillDatalist(els.judgeNameOptions, judges);
   fillDatalist(els.recorderNameOptions, recorders);
+  fillDatalist(els.competitionNameOptions, competitions);
   fillDatalist(els.playerNameOptions, players);
   fillDatalist(els.teamNameOptions, teams);
+  SIDES.forEach(renderSidePlayerSuggestions);
+}
+
+function renderSidePlayerSuggestions(side) {
+  const datalist = els[`${side}PlayerNameOptions`];
+  if (!datalist) return;
+  const players = new Set();
+  const roster = getRosterForSide(side);
+  if (roster?.players?.length) {
+    roster.players.forEach((player) => addSuggestion(players, player));
+  } else {
+    readRosters().forEach((candidate) => {
+      if (!isCompetitionMarker(candidate)) (candidate.players || []).forEach((player) => addSuggestion(players, player));
+    });
+  }
+  fillDatalist(datalist, players);
 }
 function markDirty() {
   formDirty = true;
@@ -649,19 +718,19 @@ function exportRecords() {
 function exportSpreadsheet() {
   const records = readRecords();
   const exportRecords = records.length ? records : [buildMatchRecord()];
-  const csv = buildSpreadsheetCsv(exportRecords);
-  downloadTextFile(csv, `debate-score-records-${new Date().toISOString().slice(0, 10)}.csv`, "text/csv;charset=utf-8");
-  flashStatus("已匯出試算表");
+  const csv = buildSpreadsheetCsv(exportRecords, readRosters());
+  downloadTextFile(csv, `debate-score-data-${new Date().toISOString().slice(0, 10)}.csv`, "text/csv;charset=utf-8");
+  flashStatus("已匯出計分紀錄與檢錄名單");
 }
 
 function showSpreadsheetText() {
   const records = readRecords();
   const exportRecords = records.length ? records : [buildMatchRecord()];
-  els.spreadsheetTextOutput.value = buildSpreadsheetTsv(exportRecords);
+  els.spreadsheetTextOutput.value = buildSpreadsheetTsv(exportRecords, readRosters());
   els.spreadsheetTextPanel.classList.remove("is-hidden");
   els.spreadsheetTextOutput.focus();
   els.spreadsheetTextOutput.select();
-  flashStatus("已顯示貼上用表格");
+  flashStatus("已顯示計分紀錄與檢錄名單表格");
 }
 
 async function copySpreadsheetText() {
@@ -677,27 +746,33 @@ async function copySpreadsheetText() {
   }
 }
 
-async function importSpreadsheet() {
-  const file = els.importSpreadsheet.files?.[0];
+async function importSpreadsheet(event) {
+  const input = event?.target || els.importSpreadsheet;
+  const file = input.files?.[0];
   if (!file) return;
 
   try {
     const text = await file.text();
     const importedRecords = buildRecordsFromSpreadsheetCsv(text);
-    if (!importedRecords.length) {
-      flashStatus("沒有可匯入的紀錄");
+    const importedRosters = buildRostersFromSpreadsheetCsv(text);
+    if (!importedRecords.length && !importedRosters.length) {
+      flashStatus("沒有可匯入的紀錄或檢錄名單");
       return;
     }
 
     const records = readRecords();
+    const rosters = readRosters();
     const duplicateCount = importedRecords.filter((record) => {
       const key = getJudgeBallotKey(record);
       return key && records.some((existing) => getJudgeBallotKey(existing) === key);
     }).length;
+    const duplicateRosterCount = importedRosters.filter((roster) =>
+      rosters.some((existing) => existing.id === roster.id)
+    ).length;
 
-    if (duplicateCount) {
+    if (duplicateCount || duplicateRosterCount) {
       const confirmed = window.confirm(
-        `這份試算表有 ${duplicateCount} 張裁判表已經存在。\n\n` +
+        `這份試算表有 ${duplicateCount} 張裁判表、${duplicateRosterCount} 份檢錄名單已經存在。\n\n` +
         `是否要用匯入資料更新舊資料？`
       );
       if (!confirmed) {
@@ -706,12 +781,17 @@ async function importSpreadsheet() {
       }
     }
 
-    writeRecords(mergeImportedRecords(records, importedRecords));
-    flashStatus(`已匯入 ${importedRecords.length} 張裁判表`);
+    if (importedRecords.length) writeRecords(mergeImportedRecords(records, importedRecords));
+    if (importedRosters.length) writeRosters(mergeImportedRosters(rosters, importedRosters));
+    if (!importedRecords.length) {
+      renderNameSuggestions();
+      renderRosters();
+    }
+    flashStatus(`已匯入 ${importedRecords.length} 張裁判表、${importedRosters.length} 份檢錄名單`);
   } catch (error) {
     flashStatus("匯入失敗，請確認是本系統匯出的 CSV");
   } finally {
-    els.importSpreadsheet.value = "";
+    input.value = "";
   }
 }
 
@@ -739,11 +819,14 @@ function buildRecordsFromSpreadsheetCsv(text) {
   const headerIndex = new Map(headers.map((header, index) => [header, index]));
   const requiredHeaders = ["盃賽名稱", "時段", "會場", "方別", "選手序號", "選手姓名"];
   if (!requiredHeaders.every((header) => headerIndex.has(header))) return [];
+  const hasTypeHeader = headerIndex.has("資料類型");
 
   const grouped = new Map();
   table.slice(1).forEach((row) => {
     if (!row.some((value) => String(value || "").trim())) return;
     const get = (header) => row[headerIndex.get(header)] ?? "";
+    const dataType = hasTypeHeader ? stringValue(get("資料類型")) : "裁判表";
+    if (dataType && dataType !== "裁判表") return;
     const competitionName = stringValue(get("盃賽名稱")) || "未命名盃賽";
     const period = integerOrBlank(get("時段"));
     const venue = integerOrBlank(get("會場"));
@@ -850,6 +933,70 @@ function mergeImportedRecords(records, importedRecords) {
       merged.splice(duplicateIndex, 1);
     }
     merged.unshift(record);
+  });
+  return merged;
+}
+
+function buildRostersFromSpreadsheetCsv(text) {
+  const table = parseCsv(text);
+  if (table.length < 2) return [];
+  const headers = table[0].map((header) => String(header || "").replace(/^\uFEFF/, "").trim());
+  const headerIndex = new Map(headers.map((header, index) => [header, index]));
+  const requiredHeaders = ["資料類型", "盃賽名稱", "隊伍", "選手序號", "選手姓名"];
+  if (!requiredHeaders.every((header) => headerIndex.has(header))) return [];
+
+  const grouped = new Map();
+  table.slice(1).forEach((row) => {
+    if (!row.some((value) => String(value || "").trim())) return;
+    const get = (header) => row[headerIndex.get(header)] ?? "";
+    const dataType = stringValue(get("資料類型"));
+    if (dataType !== "檢錄名單" && dataType !== "盃賽檢錄") return;
+
+    const competitionName = stringValue(get("盃賽名稱")) || "未命名盃賽";
+    const team = dataType === "盃賽檢錄" ? COMPETITION_MARKER_TEAM : stringValue(get("隊伍"));
+    if (dataType === "檢錄名單" && !team) return;
+
+    const id = `${competitionName}｜${team}`;
+    const roster = grouped.get(id) || {
+      id,
+      kind: dataType === "盃賽檢錄" ? "competition-marker" : "team-roster",
+      competitionName,
+      team,
+      playerSlots: [],
+      updatedAt: new Date().toISOString(),
+    };
+    const playerName = stringValue(get("選手姓名"));
+    if (playerName) {
+      const playerIndex = Math.max(0, (Number.parseInt(get("選手序號"), 10) || roster.playerSlots.length + 1) - 1);
+      roster.playerSlots[playerIndex] = playerName;
+    }
+    grouped.set(id, roster);
+  });
+
+  return [...grouped.values()].map((roster) => {
+    const players = roster.playerSlots
+      .filter(Boolean)
+      .filter((player, index, list) => list.findIndex((candidate) => normalizePersonName(candidate) === normalizePersonName(player)) === index);
+    const normalized = {
+      id: roster.id,
+      competitionName: roster.competitionName,
+      team: roster.team,
+      players,
+      updatedAt: roster.updatedAt,
+    };
+    if (roster.kind === "competition-marker") normalized.kind = "competition-marker";
+    return normalized;
+  });
+}
+
+function mergeImportedRosters(rosters, importedRosters) {
+  const merged = [...rosters];
+  importedRosters.forEach((roster) => {
+    const duplicateIndex = merged.findIndex((existing) => existing.id === roster.id);
+    if (duplicateIndex >= 0) {
+      merged.splice(duplicateIndex, 1);
+    }
+    merged.unshift(roster);
   });
   return merged;
 }
@@ -1106,6 +1253,7 @@ function getMatchSummaries(records) {
       negativeTotalScore: 0,
       affirmativeSpeakerRankPoints: 0,
       negativeSpeakerRankPoints: 0,
+      speakerRankPlayers: new Map(),
     };
 
     existing.ballots += 1;
@@ -1124,6 +1272,7 @@ function getMatchSummaries(records) {
     const speakerRankPoints = getTeamSpeakerRankPoints(record);
     existing.affirmativeSpeakerRankPoints += speakerRankPoints.affirmative;
     existing.negativeSpeakerRankPoints += speakerRankPoints.negative;
+    addRecordSpeakerRanksToSummary(existing, record);
 
     const recordWinner = getRecordWinner(record);
     if (recordWinner === "正方勝") {
@@ -1142,6 +1291,48 @@ function getMatchSummaries(records) {
     String(a.period).localeCompare(String(b.period), "zh-Hant", { numeric: true }) ||
     String(a.venue).localeCompare(String(b.venue), "zh-Hant", { numeric: true })
   );
+}
+
+function addRecordSpeakerRanksToSummary(summary, record) {
+  getRankedMatchPlayers(record.players, record.teams).forEach((player, index) => {
+    const key = getPlayerKey(player.name, player.team);
+    const existing = summary.speakerRankPlayers.get(key) || {
+      name: player.name,
+      team: player.team,
+      rankPoints: 0,
+      appearances: 0,
+      scoreTotal: 0,
+    };
+    existing.rankPoints += index + 1;
+    existing.appearances += 1;
+    existing.scoreTotal += Number(player.total) || 0;
+    summary.speakerRankPlayers.set(key, existing);
+  });
+}
+
+function getSummarySpeakerRanking(summary) {
+  return [...(summary.speakerRankPlayers?.values() || [])]
+    .sort((a, b) =>
+      a.rankPoints - b.rankPoints ||
+      b.appearances - a.appearances ||
+      b.scoreTotal - a.scoreTotal ||
+      a.name.localeCompare(b.name)
+    );
+}
+
+function getSummaryBestSpeakers(summary) {
+  const ranking = getSummarySpeakerRanking(summary);
+  if (!ranking.length) return [];
+  const bestRankPoints = ranking[0].rankPoints;
+  return ranking.filter((player) => player.rankPoints === bestRankPoints);
+}
+
+function formatSummaryBestSpeakers(summary) {
+  const bestSpeakers = getSummaryBestSpeakers(summary);
+  if (!bestSpeakers.length) return "尚未產生";
+  return bestSpeakers
+    .map((player) => `${player.name}（${player.team}，名次加總 ${formatNumber(player.rankPoints)}）`)
+    .join("、");
 }
 
 function getSummaryWinner(summary) {
@@ -1321,6 +1512,534 @@ function renderCycleResult(ranking, rankingRules) {
   `;
 }
 
+
+function readPlayerGrowthRecords() {
+  try {
+    return JSON.parse(localStorage.getItem(PLAYER_GROWTH_STORAGE_KEY)) || [];
+  } catch {
+    return [];
+  }
+}
+
+function writePlayerGrowthRecords(records) {
+  localStorage.setItem(PLAYER_GROWTH_STORAGE_KEY, JSON.stringify(records));
+  renderPlayerGrowthOptions();
+  renderPlayerGrowth();
+}
+
+function getMetricLabel(metric) {
+  return {
+    totalAverage: "總分平均",
+    winRate: "盃賽勝率",
+    speechAverage: "申論平均",
+    questionAverage: "質詢平均",
+    defenseAverage: "答辯平均",
+    total: "個人總分",
+    speech: "申論",
+    question: "質詢",
+    defense: "答辯",
+  }[metric] || "總分平均";
+}
+
+function getMetricValue(entry, metric) {
+  if (metric === "winRate") return (Number(entry.winRate) || 0) * 100;
+  return Number(entry[metric]) || 0;
+}
+
+function getAllPlayerGrowthEntries() {
+  return readRecords().flatMap((record) =>
+    SIDES.flatMap((side) =>
+      (record.players?.[side] || [])
+        .filter((player) => (player.name || "").trim())
+        .map((player) => ({
+          id: `${record.id}-${side}-${player.name}`,
+          source: "比賽紀錄",
+          name: player.name.trim(),
+          competitionName: record.competitionName || "未命名盃賽",
+          matchDate: record.matchDate || record.createdAt?.slice(0, 10) || "",
+          matchLabel: `${getMatchLabel(record)}｜${record.teams?.[side] || SIDE_LABELS[side]}`,
+          team: record.teams?.[side] || "",
+          side,
+          speech: Number(player.speech) || 0,
+          question: Number(player.question) || 0,
+          defense: Number(player.defense) || 0,
+          total: Number(player.total) || 0,
+          win: getRecordWinner(record) === SIDE_LABELS[side] + "勝" ? 1 : 0,
+          matchKey: getMatchKey(record),
+          note: player.note || "",
+        }))
+    )
+  ).sort((a, b) => {
+    const dateCompare = String(a.matchDate || "").localeCompare(String(b.matchDate || ""));
+    if (dateCompare !== 0) return dateCompare;
+    return String(a.competitionName || "").localeCompare(String(b.competitionName || ""));
+  });
+}
+
+function getPlayerWinRateEntries(playerName, competitionFilter = "") {
+  const normalizedPlayer = normalizeName(playerName);
+  if (!normalizedPlayer) return [];
+
+  const summariesByKey = new Map(getMatchSummaries(readRecords()).map((summary) => [summary.key, summary]));
+  const matches = new Map();
+
+  readRecords().forEach((record) => {
+    if (competitionFilter && normalizeCompetitionName(record.competitionName) !== normalizeCompetitionName(competitionFilter)) return;
+
+    SIDES.forEach((side) => {
+      const hasPlayer = (record.players?.[side] || []).some((player) => normalizeName(player.name) === normalizedPlayer);
+      if (!hasPlayer) return;
+
+      const key = `${getMatchKey(record)}｜${side}`;
+      if (matches.has(key)) return;
+
+      const summary = summariesByKey.get(getMatchKey(record));
+      const matchWinner = summary ? getSummaryWinner(summary) : getRecordWinner(record);
+      matches.set(key, {
+        competitionName: record.competitionName || "未命名盃賽",
+        matchDate: record.matchDate || record.createdAt?.slice(0, 10) || "",
+        win: matchWinner === `${SIDE_LABELS[side]}勝` ? 1 : 0,
+      });
+    });
+  });
+
+  const competitions = new Map();
+  [...matches.values()].forEach((match) => {
+    const key = normalizeCompetitionName(match.competitionName);
+    const existing = competitions.get(key) || {
+      id: key,
+      name: playerName,
+      competitionName: match.competitionName,
+      matchDate: match.matchDate,
+      matchLabel: "盃賽勝率",
+      wins: 0,
+      matches: 0,
+    };
+    existing.wins += match.win;
+    existing.matches += 1;
+    if (!existing.matchDate || (match.matchDate && match.matchDate < existing.matchDate)) {
+      existing.matchDate = match.matchDate;
+    }
+    competitions.set(key, existing);
+  });
+
+  return [...competitions.values()]
+    .map((entry) => ({
+      ...entry,
+      winRate: entry.wins / Math.max(1, entry.matches),
+      ballots: entry.matches,
+    }))
+    .sort((a, b) => {
+      const dateCompare = String(a.matchDate || "").localeCompare(String(b.matchDate || ""));
+      if (dateCompare !== 0) return dateCompare;
+      return String(a.competitionName || "").localeCompare(String(b.competitionName || ""), "zh-Hant");
+    });
+}
+
+function getPlayerTimelineEntries(entries) {
+  const grouped = new Map();
+
+  entries.forEach((entry) => {
+    const key = [
+      normalizeName(entry.name),
+      normalizeCompetitionName(entry.competitionName),
+      entry.matchKey || entry.matchLabel || "",
+      entry.matchDate || "",
+      normalizeTeamName(entry.team || ""),
+    ].join("｜");
+    const existing = grouped.get(key) || {
+      id: key,
+      source: entry.source,
+      name: entry.name,
+      competitionName: entry.competitionName,
+      matchDate: entry.matchDate,
+      matchLabel: entry.matchLabel,
+      team: entry.team,
+      ballots: 0,
+      speechTotal: 0,
+      questionTotal: 0,
+      defenseTotal: 0,
+      totalScoreTotal: 0,
+      winTotal: 0,
+      note: entry.note || "",
+    };
+
+    existing.ballots += 1;
+    existing.speechTotal += Number(entry.speech) || 0;
+    existing.questionTotal += Number(entry.question) || 0;
+    existing.defenseTotal += Number(entry.defense) || 0;
+    existing.totalScoreTotal += Number(entry.total) || 0;
+    existing.winTotal += Number(entry.win) || 0;
+    grouped.set(key, existing);
+  });
+
+  return [...grouped.values()]
+    .map((entry) => ({
+      ...entry,
+      speechAverage: entry.speechTotal / Math.max(1, entry.ballots),
+      questionAverage: entry.questionTotal / Math.max(1, entry.ballots),
+      defenseAverage: entry.defenseTotal / Math.max(1, entry.ballots),
+      totalAverage: entry.totalScoreTotal / Math.max(1, entry.ballots),
+      winAverage: entry.winTotal / Math.max(1, entry.ballots),
+      speech: entry.speechTotal / Math.max(1, entry.ballots),
+      question: entry.questionTotal / Math.max(1, entry.ballots),
+      defense: entry.defenseTotal / Math.max(1, entry.ballots),
+      total: entry.totalScoreTotal / Math.max(1, entry.ballots),
+    }))
+    .sort((a, b) => {
+      const dateCompare = String(a.matchDate || "").localeCompare(String(b.matchDate || ""));
+      if (dateCompare !== 0) return dateCompare;
+      return String(a.matchLabel || "").localeCompare(String(b.matchLabel || ""), "zh-Hant", { numeric: true });
+    });
+}
+
+function getPlayerStage(entries, playerName, competitionName, metric) {
+  if (!competitionName) return "請先選擇盃賽";
+  const normalizedPlayer = normalizeName(playerName);
+  const pool = entries
+    .filter((entry) => normalizeCompetitionName(entry.competitionName) === normalizeCompetitionName(competitionName))
+    .filter((entry) => Number(getMetricValue(entry, metric)) > 0);
+  if (pool.length < 5) return "同盃賽資料不足";
+
+  const bestByPlayer = new Map();
+  pool.forEach((entry) => {
+    const key = normalizeName(entry.name);
+    const value = Number(getMetricValue(entry, metric)) || 0;
+    if (!bestByPlayer.has(key) || value > bestByPlayer.get(key).value) {
+      bestByPlayer.set(key, { name: entry.name, value });
+    }
+  });
+  const ranking = [...bestByPlayer.values()].sort((a, b) => b.value - a.value || a.name.localeCompare(b.name));
+  const index = ranking.findIndex((entry) => normalizeName(entry.name) === normalizedPlayer);
+  if (index < 0) return "此盃賽尚無該選手紀錄";
+  const ratio = (index + 1) / ranking.length;
+  if (ratio <= 0.2) return `第 5 階段（前 20%，第 ${index + 1}/${ranking.length}）`;
+  if (ratio <= 0.4) return `第 4 階段（前 20–40%，第 ${index + 1}/${ranking.length}）`;
+  if (ratio <= 0.6) return `第 3 階段（中段，第 ${index + 1}/${ranking.length}）`;
+  if (ratio <= 0.8) return `第 2 階段（後 40%，第 ${index + 1}/${ranking.length}）`;
+  return `第 1 階段（後 20%，第 ${index + 1}/${ranking.length}）`;
+}
+
+function describeTrend(playerEntries, metric) {
+  if (playerEntries.length < 3) return "累積 3 場後判斷";
+  const split = Math.max(1, Math.floor(playerEntries.length / 2));
+  const early = playerEntries.slice(0, split);
+  const recent = playerEntries.slice(split);
+  const average = (items) => items.reduce((sum, entry) => sum + getMetricValue(entry, metric), 0) / Math.max(1, items.length);
+  const delta = average(recent) - average(early);
+  const threshold = metric === "winRate" ? 5 : 3;
+  const unit = metric === "winRate" ? "%" : "";
+  if (delta >= threshold) return `正在上升（近幾場平均 +${formatNumber(delta)}${unit}）`;
+  if (delta <= -threshold) return `需要留意（近幾場平均 ${formatNumber(delta)}${unit}）`;
+  return "大致持平";
+}
+
+function renderTrendChart(entries, metric) {
+  if (!els.playerTrendChart) return;
+  els.playerTrendChart.innerHTML = "";
+  if (!entries.length) {
+    els.playerTrendChart.textContent = "尚無資料";
+    return;
+  }
+  const width = 720;
+  const height = 260;
+  const padding = 36;
+  const values = entries.map((entry) => getMetricValue(entry, metric));
+  const min = Math.min(...values, 0);
+  const baselineMax = getMetricChartMax(metric);
+  const max = Math.max(...values, baselineMax);
+  const range = Math.max(1, max - min);
+  const points = values.map((value, index) => {
+    const x = entries.length === 1 ? width / 2 : padding + (index * (width - padding * 2)) / (entries.length - 1);
+    const y = height - padding - ((value - min) / range) * (height - padding * 2);
+    return `${x},${y}`;
+  }).join(" ");
+  const circles = values.map((value, index) => {
+    const x = entries.length === 1 ? width / 2 : padding + (index * (width - padding * 2)) / (entries.length - 1);
+    const y = height - padding - ((value - min) / range) * (height - padding * 2);
+    return `<circle cx="${x}" cy="${y}" r="4"><title>${entries[index].competitionName}｜${entries[index].matchLabel}｜${formatNumber(value)}${metric === "winRate" ? "%" : ""}</title></circle>`;
+  }).join("");
+  els.playerTrendChart.innerHTML = `
+    <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${getMetricLabel(metric)}趨勢圖">
+      <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" class="chart-axis" />
+      <line x1="${padding}" y1="${padding}" x2="${padding}" y2="${height - padding}" class="chart-axis" />
+      <polyline points="${points}" class="trend-line" />
+      ${circles}
+      <text x="${padding}" y="24" class="chart-label">最高 ${formatNumber(max)}${metric === "winRate" ? "%" : ""}</text>
+      <text x="${padding}" y="${height - 8}" class="chart-label">最低 ${formatNumber(min)}${metric === "winRate" ? "%" : ""}</text>
+    </svg>
+  `;
+}
+
+function getMetricChartMax(metric) {
+  if (metric === "winRate") return 100;
+  if (metric === "speechAverage" || metric === "questionAverage") return 20;
+  if (metric === "defenseAverage") return 10;
+  return 100;
+}
+
+function renderPlayerGrowthOptions() {
+  if (!els.playerGrowthCompetition) return;
+  const entries = getAllPlayerGrowthEntries();
+  const competitions = [...new Set(entries.map((entry) => entry.competitionName).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const current = els.playerGrowthCompetition.value;
+  els.playerGrowthCompetition.innerHTML = '<option value="">全部盃賽</option>' + competitions.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("");
+  if (competitions.includes(current)) els.playerGrowthCompetition.value = current;
+}
+
+function renderPlayerGrowth() {
+  if (!els.playerGrowthName) return;
+  const name = els.playerGrowthName.value.trim() || els.playerSelfName?.value.trim() || "";
+  const metric = els.playerGrowthMetric.value || "totalAverage";
+  const competition = els.playerGrowthCompetition.value || "";
+  const entries = getAllPlayerGrowthEntries();
+  let playerEntries = metric === "winRate"
+    ? getPlayerWinRateEntries(name, competition)
+    : getPlayerTimelineEntries(entries.filter((entry) => normalizeName(entry.name) === normalizeName(name)));
+  if (competition && metric !== "winRate") {
+    playerEntries = playerEntries.filter((entry) => normalizeCompetitionName(entry.competitionName) === normalizeCompetitionName(competition));
+  }
+
+  els.playerGameCount.textContent = String(playerEntries.length);
+  const latest = playerEntries[playerEntries.length - 1];
+  els.playerLatestScore.textContent = latest ? `${formatNumber(getMetricValue(latest, metric))}${metric === "winRate" ? "%" : ""}` : "—";
+  els.playerTrendText.textContent = name ? describeTrend(playerEntries, metric) : "尚未選擇選手";
+  els.playerStageText.textContent = metric === "winRate"
+    ? "以盃賽勝率觀察"
+    : (name ? getPlayerStage(getPlayerTimelineEntries(entries), name, competition || latest?.competitionName || "", metric) : "尚未分析");
+  els.playerChartCaption.textContent = name ? `${name} 的${getMetricLabel(metric)}趨勢` : "請先選擇選手。";
+  renderTrendChart(playerEntries, metric);
+
+  if (!name) {
+    els.playerInsightText.textContent = "請先輸入或選擇選手姓名。";
+  } else if (playerEntries.length < 3) {
+    els.playerInsightText.textContent = "目前資料還少，先累積三場以上，就能看出比較穩定的上升或下降趨勢。";
+  } else {
+    els.playerInsightText.textContent = `${name} 目前${getMetricLabel(metric)}${describeTrend(playerEntries, metric)}。五階段判讀會用同盃賽選手資料估算，資料越完整越準。`;
+  }
+
+  els.playerRecordCount.textContent = `${playerEntries.length} 筆`;
+  if (!playerEntries.length) {
+    els.playerRecordsTable.innerHTML = '<p class="empty-note">尚無此選手紀錄。</p>';
+    return;
+  }
+  els.playerRecordsTable.innerHTML = `
+    <table>
+      <thead><tr><th>日期</th><th>盃賽</th><th>場次</th><th>申論平均</th><th>質詢平均</th><th>答辯平均</th><th>總分平均</th><th>盃賽勝率</th><th>資料數</th></tr></thead>
+      <tbody>${playerEntries.map((entry) => `
+        <tr>
+          <td>${escapeHtml(entry.matchDate || "—")}</td>
+          <td>${escapeHtml(entry.competitionName || "—")}</td>
+          <td>${escapeHtml(entry.matchLabel || "—")}</td>
+          <td>${entry.speechAverage == null ? "—" : formatNumber(entry.speechAverage)}</td>
+          <td>${entry.questionAverage == null ? "—" : formatNumber(entry.questionAverage)}</td>
+          <td>${entry.defenseAverage == null ? "—" : formatNumber(entry.defenseAverage)}</td>
+          <td>${entry.totalAverage == null ? "—" : formatNumber(entry.totalAverage)}</td>
+          <td>${entry.winRate == null ? "—" : `${formatNumber(entry.winRate * 100)}%`}</td>
+          <td>${entry.ballots || entry.matches || 0}</td>
+        </tr>`).join("")}</tbody>
+    </table>`;
+}
+
+function getRankingCompetitions(records = readRecords()) {
+  return [...new Set(records.map((record) => record.competitionName).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b));
+}
+
+function renderTournamentRankingOptions(records = readRecords()) {
+  if (!els.rankingCompetition) return;
+  const competitions = getRankingCompetitions(records);
+  const current = els.rankingCompetition.value;
+  els.rankingCompetition.innerHTML = '<option value="">全部盃賽</option>' + competitions
+    .map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`)
+    .join("");
+  if (competitions.includes(current)) {
+    els.rankingCompetition.value = current;
+  }
+  renderTournamentRankings(records);
+}
+
+function getRankingPlayerEntry(map, player, fallbackTeam) {
+  const name = (player.name || "").trim();
+  if (!name) return null;
+  const team = (player.team || fallbackTeam || "").trim();
+  const key = getPlayerKey(name, team);
+  if (!map.has(key)) {
+    map.set(key, {
+      name,
+      team,
+      ranks: [],
+      speech: [],
+      question: [],
+      defense: [],
+    });
+  }
+  return map.get(key);
+}
+
+function getTournamentRankingData(records, competitionFilter) {
+  const normalizedCompetition = normalizeCompetitionName(competitionFilter || "");
+  const players = new Map();
+  records
+    .filter((record) => !normalizedCompetition || normalizeCompetitionName(record.competitionName) === normalizedCompetition)
+    .forEach((record) => {
+      const teams = record.teams || {};
+      getRankedMatchPlayers(record.players, teams).forEach((player, index) => {
+        const entry = getRankingPlayerEntry(players, player, player.team);
+        if (entry) entry.ranks.push(index + 1);
+      });
+
+      SIDES.forEach((side) => {
+        (record.players?.[side] || []).forEach((player) => {
+          const entry = getRankingPlayerEntry(players, player, teams[side] || SIDE_LABELS[side]);
+          if (!entry) return;
+          SCORE_FIELDS.forEach((field) => {
+            const value = Number(player[field]);
+            if (Number.isFinite(value)) entry[field].push(value);
+          });
+        });
+      });
+    });
+  return [...players.values()];
+}
+
+function getSelectedRankingValues(values, direction, bestCount) {
+  const sorted = [...values].sort((a, b) => direction === "asc" ? a - b : b - a);
+  return bestCount > 0 ? sorted.slice(0, bestCount) : sorted;
+}
+
+function buildRankSumLeaders(players, minAppearances, bestCount) {
+  return players
+    .filter((player) => player.ranks.length >= minAppearances)
+    .map((player) => {
+      const selected = getSelectedRankingValues(player.ranks, "asc", bestCount);
+      const sum = selected.reduce((total, rank) => total + rank, 0);
+      return {
+        ...player,
+        value: sum,
+        selectedText: selected.join("、"),
+        count: player.ranks.length,
+      };
+    })
+    .sort((a, b) => a.value - b.value || b.count - a.count || a.name.localeCompare(b.name))
+    .slice(0, 5);
+}
+
+function buildScoreLeaders(players, field, minAppearances, bestCount) {
+  return players
+    .filter((player) => player[field].length >= minAppearances)
+    .map((player) => {
+      const selected = getSelectedRankingValues(player[field], "desc", bestCount);
+      const average = selected.reduce((total, score) => total + score, 0) / Math.max(1, selected.length);
+      return {
+        ...player,
+        value: average,
+        selectedText: selected.map(formatNumber).join("、"),
+        count: player[field].length,
+      };
+    })
+    .sort((a, b) => b.value - a.value || b.count - a.count || a.name.localeCompare(b.name))
+    .slice(0, 3);
+}
+
+function renderRankingTable(container, rows, valueLabel, emptyText, valueFormatter = formatNumber) {
+  if (!container) return;
+  if (!rows.length) {
+    container.innerHTML = `<p class="empty-note">${escapeHtml(emptyText)}</p>`;
+    return;
+  }
+  container.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>排名</th>
+          <th>選手</th>
+          <th>隊伍</th>
+          <th>${escapeHtml(valueLabel)}</th>
+          <th>採計</th>
+          <th>資料數</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map((row, index) => `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${escapeHtml(row.name || "—")}</td>
+            <td>${escapeHtml(row.team || "—")}</td>
+            <td>${escapeHtml(valueFormatter(row.value))}</td>
+            <td>${escapeHtml(row.selectedText || "—")}</td>
+            <td>${row.count}</td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+function renderTournamentRankings(records = readRecords()) {
+  if (!els.rankingCompetition) return;
+  const competition = els.rankingCompetition.value || "";
+  const minAppearances = Number.parseInt(els.rankingMinAppearances?.value || "3", 10);
+  const bestCount = Number.parseInt(els.rankingBestCount?.value || "3", 10);
+  const players = getTournamentRankingData(records, competition);
+  const emptySuffix = competition ? "此盃賽目前沒有符合門檻的資料。" : "目前沒有符合門檻的資料。";
+
+  renderRankingTable(
+    els.rankSumLeaders,
+    buildRankSumLeaders(players, minAppearances, bestCount),
+    "名次加總",
+    emptySuffix,
+    (value) => String(value)
+  );
+  renderRankingTable(
+    els.speechLeaders,
+    buildScoreLeaders(players, "speech", minAppearances, bestCount),
+    "平均分",
+    emptySuffix
+  );
+  renderRankingTable(
+    els.questionLeaders,
+    buildScoreLeaders(players, "question", minAppearances, bestCount),
+    "平均分",
+    emptySuffix
+  );
+  renderRankingTable(
+    els.defenseLeaders,
+    buildScoreLeaders(players, "defense", minAppearances, bestCount),
+    "平均分",
+    emptySuffix
+  );
+}
+
+function savePlayerSelfRecord() {
+  const name = els.playerSelfName.value.trim();
+  if (!name) {
+    flashStatus("請先輸入選手姓名");
+    return;
+  }
+  const speech = numericValue(els.playerSelfSpeech);
+  const question = numericValue(els.playerSelfQuestion);
+  const defense = numericValue(els.playerSelfDefense);
+  const record = {
+    id: crypto.randomUUID(),
+    name,
+    competitionName: els.playerSelfCompetition.value.trim() || "自填練習紀錄",
+    matchDate: els.playerSelfDate.value || new Date().toISOString().slice(0, 10),
+    matchLabel: els.playerSelfMatch.value.trim() || "自填場次",
+    speech,
+    question,
+    defense,
+    total: speech + question + defense,
+    note: els.playerSelfNote.value.trim(),
+    createdAt: new Date().toISOString(),
+  };
+  writePlayerGrowthRecords([record, ...readPlayerGrowthRecords()]);
+  els.playerGrowthName.value = name;
+  els.playerGrowthCompetition.value = record.competitionName;
+  [els.playerSelfMatch, els.playerSelfSpeech, els.playerSelfQuestion, els.playerSelfDefense, els.playerSelfNote].forEach((input) => { input.value = ""; });
+    flashStatus("已儲存選手紀錄");
+}
+
 function switchView(viewId) {
   els.appViews.forEach((view) => {
     view.classList.toggle("is-hidden", view.id !== viewId);
@@ -1333,6 +2052,11 @@ function switchView(viewId) {
   }
   if (viewId === "rosterView") {
     renderRosters();
+  }
+  if (viewId === "playerView") {
+    renderPlayerGrowthOptions();
+    renderPlayerGrowth();
+    renderTournamentRankingOptions();
   }
 }
 
@@ -1355,11 +2079,14 @@ function renderMatchSummaries(records = readRecords()) {
     const winner = getSummaryWinner(summary);
     const judges = [...new Set(summary.judges)].join("、") || "未填";
     const dateText = summary.date ? `｜${summary.date}` : "";
+    const bestSpeakerText = formatSummaryBestSpeakers(summary);
 
     article.innerHTML = `
       <div>
         <h3>${escapeHtml(summary.matchLabel)}</h3>
         <p class="record-meta">${escapeHtml(summary.competitionName)}${escapeHtml(dateText)}｜裁判表 ${summary.ballots} 張｜裁判：${escapeHtml(judges)}</p>
+        <p class="summary-scoreline">評分單：${summary.affirmativeVotes}：${summary.negativeVotes}${summary.unresolvedVotes ? `｜未決 ${summary.unresolvedVotes}` : ""}</p>
+        <p class="summary-best-speaker">該場最佳辯手：${escapeHtml(bestSpeakerText)}</p>
       </div>
       <div class="summary-votes">
         <div class="${winner === "正方勝" ? "is-winner" : ""}">
@@ -1493,6 +2220,9 @@ function buildReportSummaryHtml(records) {
     <td class="number">${summary.negativeVotes}</td>
     <td>${escapeHtml(getSummaryWinner(summary))}</td>
     <td class="number">${summary.ballots}</td>
+    <td class="number">${formatNumber(summary.affirmativeSpeakerRankPoints)}</td>
+    <td class="number">${formatNumber(summary.negativeSpeakerRankPoints)}</td>
+    <td>${escapeHtml(formatSummaryBestSpeakers(summary))}</td>
   </tr>`).join("");
 
   return `<article>
@@ -1508,6 +2238,9 @@ function buildReportSummaryHtml(records) {
           <th class="number">反方單勝</th>
           <th>整場結果</th>
           <th class="number">裁判表</th>
+          <th class="number">正方辯士加總</th>
+          <th class="number">反方辯士加總</th>
+          <th>該場最佳辯手</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -1609,17 +2342,18 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-function buildSpreadsheetCsv(records) {
-  return `\uFEFF${buildSpreadsheetRows(records).map((row) => row.map(csvCell).join(",")).join("\n")}`;
+function buildSpreadsheetCsv(records, rosters = readRosters()) {
+  return `\uFEFF${buildSpreadsheetRows(records, rosters).map((row) => row.map(csvCell).join(",")).join("\n")}`;
 }
 
-function buildSpreadsheetTsv(records) {
-  return buildSpreadsheetRows(records).map((row) => row.map(tsvCell).join("\t")).join("\n");
+function buildSpreadsheetTsv(records, rosters = readRosters()) {
+  return buildSpreadsheetRows(records, rosters).map((row) => row.map(tsvCell).join("\t")).join("\n");
 }
 
-function buildSpreadsheetRows(records) {
+function buildSpreadsheetRows(records, rosters = readRosters()) {
   const summariesByKey = new Map(getMatchSummaries(records).map((summary) => [summary.key, summary]));
   const rows = [[
+    "資料類型",
     "盃賽名稱",
     "時段",
     "會場",
@@ -1664,6 +2398,7 @@ function buildSpreadsheetRows(records) {
       sidePlayers.forEach((player, index) => {
         const rankInfo = rankByPlayerKey.get(getPlayerKey(player.name, team));
         rows.push([
+          "裁判表",
           record.competitionName || "",
           record.period || "",
           record.venue || "",
@@ -1698,6 +2433,47 @@ function buildSpreadsheetRows(records) {
           player.note || "",
         ]);
       });
+    });
+  });
+
+  rosters.forEach((roster) => {
+    const players = roster.players?.length ? roster.players : [""];
+    players.forEach((playerName, index) => {
+      rows.push([
+        isCompetitionMarker(roster) ? "盃賽檢錄" : "檢錄名單",
+        roster.competitionName || "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        roster.team === COMPETITION_MARKER_TEAM ? "" : roster.team || "",
+        index + 1,
+        playerName || "",
+        "",
+        "",
+        "",
+        "",
+        "",
+      ]);
     });
   });
 
@@ -1842,7 +2618,7 @@ function renderSeasonRankings(records = readRecords()) {
   const activeCompetition = getActiveCompetitionName();
   const rankings = getSeasonRankings(
     records.filter((record) => (record.competitionName || "未命名盃賽") === activeCompetition)
-  ).slice(0, 6);
+  ).slice(0, 5);
   renderRankingList(els.seasonRankings, rankings, (player) =>
     `${player.name}（${player.team}，平均名次 ${formatNumber(player.averageRank)}，總名次分 ${formatNumber(player.rankPoints)}，${player.appearances} 場）`
   );
@@ -1920,6 +2696,10 @@ function getSelectedRoster(side) {
 
 function normalizePersonName(name) {
   return String(name || "").trim().replace(/\s+/g, "");
+}
+
+function normalizeName(name) {
+  return normalizePersonName(name);
 }
 
 function normalizeTeamName(name) {
@@ -2109,9 +2889,10 @@ function checkUnknownTeamForRoster(side) {
   if (roster) {
     hideNewTeamPrompt(side);
     const select = els[`${side}RosterSelect`];
-    if (select && !select.value) {
+    if (select) {
       select.value = roster.id;
       renderRosterPlayerPicks(side);
+      renderSidePlayerSuggestions(side);
     }
     return;
   }
@@ -2291,6 +3072,7 @@ function renderRosters() {
     if (options.some((roster) => roster.id === previousValue)) select.value = previousValue;
   });
   renderRosterPlayerPickers();
+  SIDES.forEach(renderSidePlayerSuggestions);
 
   els.rosterList.innerHTML = "";
   if (!rosters.length) {
@@ -2370,7 +3152,8 @@ function init() {
     });
   });
   els.competitionName.addEventListener("blur", checkUnknownCompetitionForRoster);
-  els.competitionName.addEventListener("change", checkUnknownCompetitionForRoster);
+  els.competitionName.addEventListener("change", () => { checkUnknownCompetitionForRoster(); renderNameSuggestions(); });
+  els.rosterCompetition.addEventListener("input", renderNameSuggestions);
   els.saveMatch.addEventListener("click", saveMatch);
   els.saveRosterTeam.addEventListener("click", saveRosterTeam);
   els.loadAffirmativeRoster.addEventListener("click", () => loadRosterToSide("affirmative"));
@@ -2384,8 +3167,9 @@ function init() {
     checkUnknownPlayersForSide("negative");
   });
   SIDES.forEach((side) => {
+    els[`${side}Team`].addEventListener("input", () => { renderSidePlayerSuggestions(side); renderRosters(); });
     els[`${side}Team`].addEventListener("blur", () => checkUnknownTeamForRoster(side));
-    els[`${side}Team`].addEventListener("change", () => checkUnknownTeamForRoster(side));
+    els[`${side}Team`].addEventListener("change", () => { checkUnknownTeamForRoster(side); renderSidePlayerSuggestions(side); });
   });
   els.recordCompetitionFilter.addEventListener("change", () => { recordFilters.competition = els.recordCompetitionFilter.value; renderRecords(); });
   els.recordPeriodFilter.addEventListener("change", () => { recordFilters.period = els.recordPeriodFilter.value; renderRecords(); });
@@ -2405,7 +3189,18 @@ function init() {
   els.showSpreadsheetText.addEventListener("click", showSpreadsheetText);
   els.copySpreadsheetText.addEventListener("click", copySpreadsheetText);
   els.importSpreadsheet.addEventListener("change", importSpreadsheet);
+  if (els.exportRosterData) els.exportRosterData.addEventListener("click", exportSpreadsheet);
+  if (els.importRosterSpreadsheet) els.importRosterSpreadsheet.addEventListener("change", importSpreadsheet);
   els.clearRecords.addEventListener("click", clearRecords);
+  if (els.savePlayerSelfRecord) els.savePlayerSelfRecord.addEventListener("click", savePlayerSelfRecord);
+  if (els.renderPlayerGrowth) els.renderPlayerGrowth.addEventListener("click", renderPlayerGrowth);
+  [els.playerGrowthName, els.playerGrowthMetric, els.playerGrowthCompetition].forEach((element) => {
+    if (element) element.addEventListener("change", renderPlayerGrowth);
+  });
+  [els.rankingCompetition, els.rankingMinAppearances, els.rankingBestCount].forEach((element) => {
+    if (element) element.addEventListener("change", () => renderTournamentRankings());
+  });
+  if (els.playerGrowthName) els.playerGrowthName.addEventListener("input", renderPlayerGrowth);
   els.tabButtons.forEach((button) => {
     button.addEventListener("click", () => switchView(button.dataset.view));
   });
@@ -2432,6 +3227,10 @@ function init() {
   renderNameSuggestions();
   renderSeasonRankings();
   renderCycleControls();
+  if (els.playerSelfDate) els.playerSelfDate.value = new Date().toISOString().slice(0, 10);
+  renderPlayerGrowthOptions();
+  renderPlayerGrowth();
+  renderTournamentRankingOptions();
   updateCloudStatus();
 }
 

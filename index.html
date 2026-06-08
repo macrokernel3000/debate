@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>辯論比賽計分紀錄</title>
-    <link rel="stylesheet" href="styles.css?v=20260608-17" />
+    <link rel="stylesheet" href="styles.css?v=20260608-23" />
   </head>
   <body>
     <main class="app">
@@ -20,13 +20,14 @@
         <button class="tab-button is-active" type="button" data-view="scoreView">計分紀錄</button>
         <button class="tab-button" type="button" data-view="rosterView">賽事檢錄</button>
         <button class="tab-button" type="button" data-view="cycleView">循環計算器</button>
+        <button class="tab-button" type="button" data-view="playerView">統計數據</button>
       </nav>
 
       <section id="scoreView" class="app-view">
       <section class="match-meta" aria-label="比賽資訊">
         <label>
           盃賽名稱
-          <input id="competitionName" type="text" placeholder="例：某某盃辯論賽" />
+          <input id="competitionName" type="text" list="competitionNameOptions" placeholder="輸入或搜尋盃賽名稱" />
         </label>
         <div id="competitionNewRosterPrompt" class="new-player-prompt is-hidden" aria-live="polite"></div>
         <label>
@@ -199,13 +200,9 @@
         </article>
       </section>
 
-      <section class="best-panel" aria-label="本場與全程排行">
+      <section class="best-panel season-only" aria-label="全程辯士排行">
         <article>
-          <p>本場辯士排行</p>
-          <ol id="matchRankings" class="ranking-list"></ol>
-        </article>
-        <article>
-          <p>全程辯士排行</p>
+          <p>全程最佳辯手</p>
           <ol id="seasonRankings" class="ranking-list"></ol>
         </article>
       </section>
@@ -214,10 +211,10 @@
         <button class="primary" id="saveMatch" type="button">儲存本場</button>
         <button id="resetForm" type="button">清空輸入</button>
         <button id="exportRecords" type="button">匯出全部報表</button>
-        <button id="exportSpreadsheet" type="button">匯出試算表</button>
+        <button id="exportSpreadsheet" type="button">匯出資料包</button>
         <button id="showSpreadsheetText" type="button">顯示貼上用表格</button>
         <label class="import-action">
-          匯入試算表
+          匯入資料包
           <input id="importSpreadsheet" type="file" accept=".csv,text/csv" />
         </label>
         <button class="danger" id="clearRecords" type="button">刪除全部紀錄</button>
@@ -263,17 +260,22 @@
           <div class="roster-editor">
             <label>
               盃賽名稱
-              <input id="rosterCompetition" type="text" placeholder="例：育南盃中文教育辯論比賽" />
+              <input id="rosterCompetition" type="text" list="competitionNameOptions" placeholder="輸入或搜尋盃賽名稱" />
             </label>
             <label>
               隊伍／學校
-              <input id="rosterTeam" type="text" placeholder="例：小果仁A隊" />
+              <input id="rosterTeam" type="text" list="teamNameOptions" placeholder="輸入或搜尋隊伍名稱" />
             </label>
             <label class="roster-players-field">
               選手名單（一行一位）
               <textarea id="rosterPlayers" placeholder="王小明&#10;陳小華&#10;林小安"></textarea>
             </label>
             <button class="primary" id="saveRosterTeam" type="button">儲存／更新名單</button>
+            <button id="exportRosterData" type="button">匯出資料包</button>
+            <label class="import-action">
+              匯入資料包
+              <input id="importRosterSpreadsheet" type="file" accept=".csv,text/csv" />
+            </label>
           </div>
 
           <div id="rosterList" class="roster-list"></div>
@@ -377,6 +379,107 @@
           <div id="cycleResult" class="cycle-result"></div>
         </section>
       </section>
+
+      <section id="playerView" class="app-view is-hidden" aria-label="統計數據">
+        <section class="player-growth-panel">
+          <div class="section-heading">
+            <h2>統計數據</h2>
+            <p>選擇選手後，查看他在某個盃賽或所有盃賽中的分數曲線與勝率變化。</p>
+          </div>
+
+          <div class="player-entry-grid single">
+            <article class="player-card">
+              <h3>選手統計</h3>
+              <div class="player-form-grid compact">
+                <label>選手姓名<input id="playerGrowthName" type="text" list="playerNameOptions" placeholder="選擇或輸入姓名" /></label>
+                <label>觀察項目
+                  <select id="playerGrowthMetric">
+                    <option value="totalAverage">總分平均</option>
+                    <option value="speechAverage">申論平均</option>
+                    <option value="questionAverage">質詢平均</option>
+                    <option value="defenseAverage">答辯平均</option>
+                    <option value="winRate">盃賽勝率</option>
+                  </select>
+                </label>
+                <label>盃賽篩選<select id="playerGrowthCompetition"></select></label>
+              </div>
+              <button id="renderPlayerGrowth" type="button">更新分析</button>
+            </article>
+          </div>
+
+          <div class="growth-summary-grid" aria-label="統計摘要">
+            <article><p>資料點數</p><strong id="playerGameCount">0</strong></article>
+            <article><p>最新分數</p><strong id="playerLatestScore">—</strong></article>
+            <article><p>趨勢判讀</p><strong id="playerTrendText">尚未分析</strong></article>
+            <article><p>盃賽階段</p><strong id="playerStageText">尚未分析</strong></article>
+          </div>
+
+          <div class="growth-chart-card">
+            <div class="section-heading compact-heading">
+              <h2>數據曲線</h2>
+              <p id="playerChartCaption">請先選擇選手。</p>
+            </div>
+            <div id="playerTrendChart" class="trend-chart" aria-label="分數曲線圖"></div>
+          </div>
+
+          <div class="player-analysis-card">
+            <h3>系統提醒</h3>
+            <p id="playerInsightText">選擇選手後，系統會用計分紀錄中的資料整理平均分數與勝率趨勢。</p>
+          </div>
+
+          <div class="player-table-card">
+            <div class="section-heading compact-heading">
+              <h2>我的場次紀錄</h2>
+              <p id="playerRecordCount">0 筆</p>
+            </div>
+            <div id="playerRecordsTable" class="player-records-table"></div>
+          </div>
+
+          <div class="player-rank-card">
+            <div class="section-heading compact-heading">
+              <h2>盃賽排行榜</h2>
+              <p>依指定盃賽與門檻統計名次分與單項表現。</p>
+            </div>
+            <div class="player-form-grid compact">
+              <label>盃賽<select id="rankingCompetition"></select></label>
+              <label>
+                最低資料數
+                <select id="rankingMinAppearances">
+                  <option value="3">至少 3 張</option>
+                  <option value="4">至少 4 張</option>
+                  <option value="5">至少 5 張</option>
+                </select>
+              </label>
+              <label>
+                採計成績
+                <select id="rankingBestCount">
+                  <option value="3">取最佳 3 張</option>
+                  <option value="4">取最佳 4 張</option>
+                  <option value="0">全部採計</option>
+                </select>
+              </label>
+            </div>
+            <div class="rank-section-grid">
+              <article>
+                <h3>名次加總前五</h3>
+                <div id="rankSumLeaders" class="ranking-table"></div>
+              </article>
+              <article>
+                <h3>申論王</h3>
+                <div id="speechLeaders" class="ranking-table"></div>
+              </article>
+              <article>
+                <h3>質詢王</h3>
+                <div id="questionLeaders" class="ranking-table"></div>
+              </article>
+              <article>
+                <h3>答辯王</h3>
+                <div id="defenseLeaders" class="ranking-table"></div>
+              </article>
+            </div>
+          </div>
+        </section>
+      </section>
     </main>
 
     <template id="playerRowTemplate">
@@ -392,9 +495,12 @@
 
     <datalist id="judgeNameOptions"></datalist>
     <datalist id="recorderNameOptions"></datalist>
+    <datalist id="competitionNameOptions"></datalist>
+    <datalist id="affirmativePlayerNameOptions"></datalist>
+    <datalist id="negativePlayerNameOptions"></datalist>
     <datalist id="playerNameOptions"></datalist>
     <datalist id="teamNameOptions"></datalist>
 
-    <script src="app.js?v=20260608-17"></script>
+    <script src="app.js?v=20260608-23"></script>
   </body>
 </html>
