@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>辯論比賽計分紀錄</title>
-    <link rel="stylesheet" href="styles.css?v=20260608-14" />
+    <link rel="stylesheet" href="styles.css?v=20260608-17" />
   </head>
   <body>
     <main class="app">
@@ -18,6 +18,7 @@
 
       <nav class="app-tabs" aria-label="功能切換">
         <button class="tab-button is-active" type="button" data-view="scoreView">計分紀錄</button>
+        <button class="tab-button" type="button" data-view="rosterView">賽事檢錄</button>
         <button class="tab-button" type="button" data-view="cycleView">循環計算器</button>
       </nav>
 
@@ -27,6 +28,7 @@
           盃賽名稱
           <input id="competitionName" type="text" placeholder="例：某某盃辯論賽" />
         </label>
+        <div id="competitionNewRosterPrompt" class="new-player-prompt is-hidden" aria-live="polite"></div>
         <label>
           時段
           <input id="matchPeriod" type="number" min="1" max="8" step="1" inputmode="numeric" data-integer-range="true" placeholder="1-8" />
@@ -49,21 +51,6 @@
         </label>
       </section>
 
-      <section class="ballot-photo-panel" aria-label="評分單照片">
-        <div>
-          <p>評分單照片</p>
-          <strong id="ballotPhotoStatus">尚未附加照片</strong>
-        </div>
-        <label class="photo-upload">
-          <span>拍照或選擇圖片</span>
-          <input id="ballotPhotoInput" type="file" accept="image/*" capture="environment" />
-        </label>
-        <button id="removeBallotPhoto" type="button" disabled>移除照片</button>
-        <figure id="ballotPhotoPreview" class="photo-preview is-empty">
-          <span>照片預覽</span>
-        </figure>
-      </section>
-
       <section class="cloud-panel is-hidden" aria-label="雲端儲存設定">
         <div>
           <p>雲端儲存</p>
@@ -76,45 +63,11 @@
         <button id="saveCloudEndpoint" type="button">儲存連線</button>
       </section>
 
-      <section class="scoreboard" aria-label="隊伍總分">
-        <article class="side-summary affirmative">
-          <div>
-            <p>正方總分</p>
-            <strong id="affirmativeTotal">0</strong>
-          </div>
-        </article>
-        <article class="winner-card">
-          <p>目前結果</p>
-          <strong id="winnerText">尚未判定</strong>
-        </article>
-        <article class="side-summary negative">
-          <div>
-            <p>反方總分</p>
-            <strong id="negativeTotal">0</strong>
-          </div>
-        </article>
-      </section>
-
-      <section class="best-panel" aria-label="單場最佳">
-        <article>
-          <p>單場最佳辯士</p>
-          <strong id="bestPlayers">尚未產生</strong>
-        </article>
-        <article>
-          <p>本場辯士排行</p>
-          <ol id="matchRankings" class="ranking-list"></ol>
-        </article>
-        <article>
-          <p>全程辯士排行</p>
-          <ol id="seasonRankings" class="ranking-list"></ol>
-        </article>
-      </section>
-
       <section class="teams" aria-label="選手分數">
         <article class="team-panel" data-side="affirmative">
           <div class="panel-heading">
             <h2>正方</h2>
-            <input id="affirmativeTeam" type="text" placeholder="學校或隊伍名稱" />
+            <input id="affirmativeTeam" type="text" list="teamNameOptions" placeholder="學校或隊伍名稱" />
             <label class="side-argument">
               結辯
               <input id="affirmativeClosing" type="number" min="0" max="50" step="1" inputmode="numeric" />
@@ -123,6 +76,16 @@
               論點分
               <input id="affirmativeArgument" type="number" min="0" max="20" step="1" inputmode="numeric" />
             </label>
+          </div>
+          <div class="side-roster-load" aria-label="正方檢錄名單帶入">
+            <label>
+              從賽事檢錄帶入正方
+              <select id="affirmativeRosterSelect"></select>
+            </label>
+            <button id="loadAffirmativeRoster" type="button">帶入正方</button>
+            <div id="affirmativeRosterPlayers" class="roster-player-picks" aria-label="正方隊內選手快速選擇"></div>
+            <div id="affirmativeNewTeamPrompt" class="new-player-prompt is-hidden" aria-live="polite"></div>
+            <div id="affirmativeNewPlayerPrompt" class="new-player-prompt is-hidden" aria-live="polite"></div>
           </div>
           <div class="table-wrap">
             <table>
@@ -156,7 +119,7 @@
         <article class="team-panel" data-side="negative">
           <div class="panel-heading">
             <h2>反方</h2>
-            <input id="negativeTeam" type="text" placeholder="學校或隊伍名稱" />
+            <input id="negativeTeam" type="text" list="teamNameOptions" placeholder="學校或隊伍名稱" />
             <label class="side-argument">
               結辯
               <input id="negativeClosing" type="number" min="0" max="50" step="1" inputmode="numeric" />
@@ -165,6 +128,16 @@
               論點分
               <input id="negativeArgument" type="number" min="0" max="20" step="1" inputmode="numeric" />
             </label>
+          </div>
+          <div class="side-roster-load" aria-label="反方檢錄名單帶入">
+            <label>
+              從賽事檢錄帶入反方
+              <select id="negativeRosterSelect"></select>
+            </label>
+            <button id="loadNegativeRoster" type="button">帶入反方</button>
+            <div id="negativeRosterPlayers" class="roster-player-picks" aria-label="反方隊內選手快速選擇"></div>
+            <div id="negativeNewTeamPrompt" class="new-player-prompt is-hidden" aria-live="polite"></div>
+            <div id="negativeNewPlayerPrompt" class="new-player-prompt is-hidden" aria-live="polite"></div>
           </div>
           <div class="table-wrap">
             <table>
@@ -189,6 +162,51 @@
               <tbody id="negativeRows"></tbody>
             </table>
           </div>
+        </article>
+      </section>
+
+      <section class="ballot-photo-panel" aria-label="評分單照片">
+        <div>
+          <p>評分單照片</p>
+          <strong id="ballotPhotoStatus">尚未附加照片</strong>
+        </div>
+        <label class="photo-upload">
+          <span>拍照或選擇圖片</span>
+          <input id="ballotPhotoInput" type="file" accept="image/*" capture="environment" />
+        </label>
+        <button id="removeBallotPhoto" type="button" disabled>移除照片</button>
+        <figure id="ballotPhotoPreview" class="photo-preview is-empty">
+          <span>照片預覽</span>
+        </figure>
+      </section>
+
+      <section class="scoreboard" aria-label="隊伍總分">
+        <article class="side-summary affirmative">
+          <div>
+            <p>正方總分</p>
+            <strong id="affirmativeTotal">0</strong>
+          </div>
+        </article>
+        <article class="winner-card">
+          <p>目前結果</p>
+          <strong id="winnerText">尚未判定</strong>
+        </article>
+        <article class="side-summary negative">
+          <div>
+            <p>反方總分</p>
+            <strong id="negativeTotal">0</strong>
+          </div>
+        </article>
+      </section>
+
+      <section class="best-panel" aria-label="本場與全程排行">
+        <article>
+          <p>本場辯士排行</p>
+          <ol id="matchRankings" class="ranking-list"></ol>
+        </article>
+        <article>
+          <p>全程辯士排行</p>
+          <ol id="seasonRankings" class="ranking-list"></ol>
         </article>
       </section>
 
@@ -226,8 +244,40 @@
           <h2>比賽紀錄</h2>
           <p id="recordCount">0 筆</p>
         </div>
+        <div class="record-filters" aria-label="比賽紀錄快速篩選">
+          <label>盃賽 <select id="recordCompetitionFilter"></select></label>
+          <label>時段 <select id="recordPeriodFilter"></select></label>
+          <label>會場 <select id="recordVenueFilter"></select></label>
+          <button id="clearRecordFilters" type="button">顯示全部</button>
+        </div>
         <div id="recordsList" class="records-list"></div>
       </section>
+      </section>
+
+      <section id="rosterView" class="app-view is-hidden" aria-label="賽事檢錄">
+        <section class="roster-section roster-page" aria-label="檢錄賽事選手名單">
+          <div class="section-heading">
+            <h2>賽事檢錄</h2>
+            <p>先建立盃賽、隊伍與選手。回到「計分紀錄」時，可以直接把隊伍名單帶入正方或反方。</p>
+          </div>
+          <div class="roster-editor">
+            <label>
+              盃賽名稱
+              <input id="rosterCompetition" type="text" placeholder="例：育南盃中文教育辯論比賽" />
+            </label>
+            <label>
+              隊伍／學校
+              <input id="rosterTeam" type="text" placeholder="例：小果仁A隊" />
+            </label>
+            <label class="roster-players-field">
+              選手名單（一行一位）
+              <textarea id="rosterPlayers" placeholder="王小明&#10;陳小華&#10;林小安"></textarea>
+            </label>
+            <button class="primary" id="saveRosterTeam" type="button">儲存／更新名單</button>
+          </div>
+
+          <div id="rosterList" class="roster-list"></div>
+        </section>
       </section>
 
       <section id="cycleView" class="app-view is-hidden" aria-label="循環計算器">
@@ -343,7 +393,8 @@
     <datalist id="judgeNameOptions"></datalist>
     <datalist id="recorderNameOptions"></datalist>
     <datalist id="playerNameOptions"></datalist>
+    <datalist id="teamNameOptions"></datalist>
 
-    <script src="app.js?v=20260608-14"></script>
+    <script src="app.js?v=20260608-17"></script>
   </body>
 </html>

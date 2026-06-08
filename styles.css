@@ -838,3 +838,220 @@ td input[data-field="defense"] {
     width: fit-content;
   }
 }
+
+
+.side-roster-load {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.side-roster-load select {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid #ccd6e2;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+}
+
+.roster-section {
+  margin-top: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: var(--shadow);
+}
+
+.roster-editor,
+.roster-quick-load,
+.record-filters {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.roster-editor {
+  grid-template-columns: 1fr 1fr minmax(260px, 1.2fr) auto;
+  align-items: end;
+}
+
+.roster-quick-load,
+.record-filters {
+  grid-template-columns: 1fr auto 1fr auto;
+  align-items: end;
+  border-top: 1px solid var(--line);
+}
+
+.roster-players-field textarea {
+  width: 100%;
+  min-height: 74px;
+  border: 1px solid #ccd6e2;
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--ink);
+  background: #fff;
+  resize: vertical;
+  font: inherit;
+}
+
+.roster-list {
+  display: grid;
+  gap: 10px;
+  padding: 0 16px 16px;
+}
+
+.roster-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+}
+
+.roster-card p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.record-filters {
+  grid-template-columns: repeat(3, minmax(150px, 1fr)) auto;
+  border-top: 0;
+  border-bottom: 1px solid var(--line);
+  background: #f8fafc;
+}
+
+.record-filters select,
+.roster-quick-load select {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid #ccd6e2;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+}
+
+button.is-saved {
+  border-color: var(--green);
+  color: #fff;
+  background: var(--green);
+  box-shadow: 0 0 0 4px rgba(17, 114, 77, 0.15);
+}
+
+@media (max-width: 760px) {
+  .roster-editor,
+  .roster-quick-load,
+  .record-filters,
+  .side-roster-load {
+    grid-template-columns: 1fr;
+  }
+
+  .roster-card {
+    display: grid;
+  }
+}
+
+
+.roster-page {
+  margin-top: 0;
+}
+
+.roster-quick-load-note {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 180px;
+}
+
+.roster-quick-load-note span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.roster-player-picks {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.roster-player-picks strong {
+  color: #374151;
+  margin-right: 2px;
+}
+
+.roster-player-picks button {
+  border: 1px solid #d7deea;
+  background: #fff;
+  color: #374151;
+  border-radius: 999px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.roster-player-picks button:hover {
+  border-color: #9ab1d5;
+  background: #f5f8ff;
+}
+
+.roster-card-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+
+.new-player-prompt {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid #f3cf8c;
+  border-radius: 14px;
+  background: #fff8e8;
+  color: #6b4d12;
+  font-size: 0.92rem;
+}
+
+.new-player-prompt.is-hidden {
+  display: none;
+}
+
+.new-player-prompt button {
+  min-height: 30px;
+  border: 1px solid #e7b85c;
+  background: #fff;
+  color: #6b4d12;
+  border-radius: 999px;
+  padding: 0 10px;
+  cursor: pointer;
+}
+
+.new-player-prompt button:hover {
+  background: #fff0c7;
+}
+
+.new-player-prompt .muted-action {
+  border-color: #d8d2c5;
+  color: #746f66;
+}

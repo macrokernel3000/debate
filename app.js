@@ -1,4 +1,6 @@
 const STORAGE_KEY = "yunan-cup-score-records";
+const ROSTER_STORAGE_KEY = "yunan-cup-team-rosters";
+const COMPETITION_MARKER_TEAM = "__COMPETITION_MARKER__";
 const CLOUD_ENDPOINT_KEY = "yunan-cup-cloud-endpoint";
 const CLOUD_ENABLED = false;
 const DEFAULT_CLOUD_ENDPOINT = "https://script.google.com/macros/s/AKfycbzzYV2pMKqdHeTf77PN-yWVLZKTGcAP2Cw7006DTrJkxSvSLzY2_mUoULmf95fXq7RmmA/exec";
@@ -21,17 +23,21 @@ const CYCLE_RANK_RULES = {
 };
 
 let currentBallotPhoto = null;
+let formDirty = false;
+const recordFilters = { competition: "", period: "", venue: "" };
 
 const els = {
   matchPeriod: document.querySelector("#matchPeriod"),
   matchVenue: document.querySelector("#matchVenue"),
   competitionName: document.querySelector("#competitionName"),
+  competitionNewRosterPrompt: document.querySelector("#competitionNewRosterPrompt"),
   matchDate: document.querySelector("#matchDate"),
   matchJudge: document.querySelector("#matchJudge"),
   matchRecorder: document.querySelector("#matchRecorder"),
   judgeNameOptions: document.querySelector("#judgeNameOptions"),
   recorderNameOptions: document.querySelector("#recorderNameOptions"),
   playerNameOptions: document.querySelector("#playerNameOptions"),
+  teamNameOptions: document.querySelector("#teamNameOptions"),
   ballotPhotoInput: document.querySelector("#ballotPhotoInput"),
   ballotPhotoStatus: document.querySelector("#ballotPhotoStatus"),
   ballotPhotoPreview: document.querySelector("#ballotPhotoPreview"),
@@ -67,9 +73,28 @@ const els = {
   clearRecords: document.querySelector("#clearRecords"),
   matchSummaryList: document.querySelector("#matchSummaryList"),
   matchSummaryCount: document.querySelector("#matchSummaryCount"),
+  recordCompetitionFilter: document.querySelector("#recordCompetitionFilter"),
+  recordPeriodFilter: document.querySelector("#recordPeriodFilter"),
+  recordVenueFilter: document.querySelector("#recordVenueFilter"),
+  clearRecordFilters: document.querySelector("#clearRecordFilters"),
   recordsList: document.querySelector("#recordsList"),
   recordCount: document.querySelector("#recordCount"),
   rowTemplate: document.querySelector("#playerRowTemplate"),
+  rosterCompetition: document.querySelector("#rosterCompetition"),
+  rosterTeam: document.querySelector("#rosterTeam"),
+  rosterPlayers: document.querySelector("#rosterPlayers"),
+  saveRosterTeam: document.querySelector("#saveRosterTeam"),
+  affirmativeRosterSelect: document.querySelector("#affirmativeRosterSelect"),
+  negativeRosterSelect: document.querySelector("#negativeRosterSelect"),
+  loadAffirmativeRoster: document.querySelector("#loadAffirmativeRoster"),
+  loadNegativeRoster: document.querySelector("#loadNegativeRoster"),
+  affirmativeRosterPlayers: document.querySelector("#affirmativeRosterPlayers"),
+  negativeRosterPlayers: document.querySelector("#negativeRosterPlayers"),
+  affirmativeNewPlayerPrompt: document.querySelector("#affirmativeNewPlayerPrompt"),
+  negativeNewPlayerPrompt: document.querySelector("#negativeNewPlayerPrompt"),
+  affirmativeNewTeamPrompt: document.querySelector("#affirmativeNewTeamPrompt"),
+  negativeNewTeamPrompt: document.querySelector("#negativeNewTeamPrompt"),
+  rosterList: document.querySelector("#rosterList"),
   tabButtons: document.querySelectorAll(".tab-button"),
   appViews: document.querySelectorAll(".app-view"),
   cycleType: document.querySelector("#cycleType"),
@@ -169,7 +194,11 @@ function createRows() {
         input.addEventListener("input", () => {
           normalizeScoreInput(input);
           calculate();
+          markDirty();
         });
+        if (input.dataset.field === "name") {
+          input.addEventListener("blur", () => checkUnknownPlayerForRoster(side, input));
+        }
       });
       tbody.append(row);
     }
@@ -291,7 +320,7 @@ function calculate() {
     negative: els.negativeTeam.value.trim() || "反方",
   };
   const rankedPlayers = getRankedMatchPlayers(players, teams);
-  els.bestPlayers.textContent = formatBestPlayers(getBestPlayers(players, teams));
+  if (els.bestPlayers) els.bestPlayers.textContent = formatBestPlayers(getBestPlayers(players, teams));
   renderRankingList(els.matchRankings, rankedPlayers.slice(0, 6), (player) =>
     `${player.name}（${player.sideLabel}，${formatNumber(player.total)}）`
   );
@@ -318,18 +347,50 @@ function renderNameSuggestions(records = readRecords()) {
   const judges = new Set();
   const recorders = new Set();
   const players = new Set();
+  const teams = new Set();
 
   records.forEach((record) => {
     addSuggestion(judges, record.judge);
     addSuggestion(recorders, record.recorder);
     SIDES.forEach((side) => {
+      addSuggestion(teams, record.teams?.[side]);
       (record.players?.[side] || []).forEach((player) => addSuggestion(players, player.name));
     });
+  });
+
+  readRosters().forEach((roster) => {
+    if (isCompetitionMarker(roster)) return;
+    addSuggestion(teams, roster.team);
+    (roster.players || []).forEach((player) => addSuggestion(players, player));
   });
 
   fillDatalist(els.judgeNameOptions, judges);
   fillDatalist(els.recorderNameOptions, recorders);
   fillDatalist(els.playerNameOptions, players);
+  fillDatalist(els.teamNameOptions, teams);
+}
+function markDirty() {
+  formDirty = true;
+}
+
+function markClean() {
+  formDirty = false;
+}
+
+function hasMeaningfulInput() {
+  if (currentBallotPhoto) return true;
+  const inputs = [
+    els.competitionName, els.matchPeriod, els.matchVenue, els.matchJudge, els.matchRecorder,
+    els.affirmativeTeam, els.negativeTeam, els.affirmativeArgument, els.negativeArgument,
+    els.affirmativeClosing, els.negativeClosing,
+  ];
+  if (inputs.some((input) => String(input.value || "").trim())) return true;
+  return SIDES.some((side) => [...els[`${side}Rows`].querySelectorAll("input")].some((input) => String(input.value || "").trim()));
+}
+
+function confirmDiscardUnsaved(actionText = "帶入其他資料") {
+  if (!formDirty || !hasMeaningfulInput()) return true;
+  return window.confirm(`目前表單有尚未儲存的資料。\n\n確定要${actionText}嗎？`);
 }
 
 function addSuggestion(set, value) {
@@ -478,9 +539,13 @@ async function saveMatch() {
     }
 
     writeRecords(upsertRecord(records, record, duplicateIndex));
+    markClean();
+    flashSaveButton();
   } catch (error) {
     record.cloudError = error instanceof Error ? error.message : "cloud save failed";
     writeRecords(upsertRecord(records, record, duplicateIndex));
+    markClean();
+    flashSaveButton();
     flashStatus("雲端儲存失敗，已保留本機紀錄");
   } finally {
     els.saveMatch.disabled = false;
@@ -501,6 +566,7 @@ function resetForm() {
   els.matchDate.value = new Date().toISOString().slice(0, 10);
   setBallotPhoto(null);
   calculate();
+  markClean();
   flashStatus("已清空輸入");
 }
 
@@ -519,6 +585,7 @@ function swapSides() {
 }
 
 function loadRecordToForm(id) {
+  if (!confirmDiscardUnsaved("帶入舊紀錄")) return;
   const record = readRecords().find((item) => item.id === id);
   if (!record) return;
 
@@ -550,6 +617,7 @@ function loadRecordToForm(id) {
   setBallotPhoto(record.ballotPhoto?.dataUrl ? { ...record.ballotPhoto } : null);
   calculate();
   renderSeasonRankings();
+  markClean();
   flashStatus("已帶入紀錄，可繼續編輯");
 }
 
@@ -901,9 +969,44 @@ function openReport(records, successMessage) {
   flashStatus(successMessage);
 }
 
+function getFilteredRecords(records) {
+  return records.filter((record) => {
+    const competition = record.competitionName || "未命名盃賽";
+    const period = record.period ? String(record.period) : "";
+    const venue = record.venue ? String(record.venue) : "";
+    return (!recordFilters.competition || competition === recordFilters.competition)
+      && (!recordFilters.period || period === recordFilters.period)
+      && (!recordFilters.venue || venue === recordFilters.venue);
+  });
+}
+
+function renderRecordFilters(records) {
+  if (!els.recordCompetitionFilter) return;
+  fillSelect(els.recordCompetitionFilter, uniqueSorted(records.map((record) => record.competitionName || "未命名盃賽")), "全部盃賽", recordFilters.competition);
+  fillSelect(els.recordPeriodFilter, uniqueSorted(records.map((record) => record.period).filter(Boolean).map(String), true), "全部時段", recordFilters.period);
+  fillSelect(els.recordVenueFilter, uniqueSorted(records.map((record) => record.venue).filter(Boolean).map(String), true), "全部會場", recordFilters.venue);
+}
+
+function uniqueSorted(values, numeric = false) {
+  const unique = [...new Set(values.filter(Boolean))];
+  return unique.sort((a, b) => numeric ? Number(a) - Number(b) : a.localeCompare(b, "zh-Hant"));
+}
+
+function fillSelect(select, values, emptyLabel, selectedValue = "") {
+  const current = selectedValue;
+  select.innerHTML = "";
+  select.append(new Option(emptyLabel, ""));
+  values.forEach((value) => select.append(new Option(value, value)));
+  select.value = values.includes(current) ? current : "";
+}
+
 function renderRecords() {
-  const records = readRecords();
-  els.recordCount.textContent = `${records.length} 筆`;
+  const allRecords = readRecords();
+  renderRecordFilters(allRecords);
+  const records = getFilteredRecords(allRecords);
+  els.recordCount.textContent = recordFilters.competition || recordFilters.period || recordFilters.venue
+    ? `${records.length} / ${allRecords.length} 筆`
+    : `${allRecords.length} 筆`;
   els.recordsList.innerHTML = "";
 
   if (!records.length) {
@@ -1227,6 +1330,9 @@ function switchView(viewId) {
   });
   if (viewId === "cycleView") {
     renderCycleControls();
+  }
+  if (viewId === "rosterView") {
+    renderRosters();
   }
 }
 
@@ -1644,6 +1750,7 @@ async function handleBallotPhotoChange() {
       dataUrl,
       savedAt: new Date().toISOString(),
     });
+    markDirty();
     flashStatus("已附加評分單照片");
   } catch {
     setBallotPhoto(null);
@@ -1768,6 +1875,481 @@ function flashStatus(message) {
   }, 1800);
 }
 
+function readRosters() {
+  try {
+    return JSON.parse(localStorage.getItem(ROSTER_STORAGE_KEY)) || [];
+  } catch {
+    return [];
+  }
+}
+
+function isCompetitionMarker(roster) {
+  return roster?.team === COMPETITION_MARKER_TEAM || roster?.kind === "competition-marker";
+}
+
+function writeRosters(rosters) {
+  localStorage.setItem(ROSTER_STORAGE_KEY, JSON.stringify(rosters));
+  renderRosters();
+  renderNameSuggestions();
+}
+
+function saveRosterTeam() {
+  const competitionName = els.rosterCompetition.value.trim() || els.competitionName.value.trim() || "未命名盃賽";
+  const team = els.rosterTeam.value.trim();
+  const players = els.rosterPlayers.value.split(/\n|、|,|，/).map((name) => name.trim()).filter(Boolean).slice(0, 12);
+  if (!team || !players.length) {
+    flashStatus("請先填隊伍名稱與至少一位選手");
+    return;
+  }
+  const roster = { id: `${competitionName}｜${team}`, competitionName, team, players, updatedAt: new Date().toISOString() };
+  const rosters = readRosters().filter((item) => item.id !== roster.id);
+  writeRosters([roster, ...rosters]);
+  els.rosterTeam.value = "";
+  els.rosterPlayers.value = "";
+  if (normalizeCompetitionName(competitionName) === normalizeCompetitionName(els.competitionName.value)) {
+    hideNewCompetitionPrompt();
+  }
+  flashStatus("已儲存選手名單");
+}
+
+function getSelectedRoster(side) {
+  const select = els[`${side}RosterSelect`];
+  if (!select?.value) return null;
+  return readRosters().find((item) => item.id === select.value) || null;
+}
+
+function normalizePersonName(name) {
+  return String(name || "").trim().replace(/\s+/g, "");
+}
+
+function normalizeTeamName(name) {
+  return String(name || "").trim().replace(/\s+/g, "");
+}
+
+function findRosterByTeam(competitionName, teamName) {
+  const cleanTeam = normalizeTeamName(teamName);
+  if (!cleanTeam) return null;
+  const rosters = readRosters().filter((roster) => !isCompetitionMarker(roster));
+  return rosters.find((roster) => {
+    const sameTeam = normalizeTeamName(roster.team) === cleanTeam;
+    const sameCompetition = !competitionName || roster.competitionName === competitionName;
+    return sameTeam && sameCompetition;
+  }) || rosters.find((roster) => normalizeTeamName(roster.team) === cleanTeam) || null;
+}
+
+function getRosterForSide(side) {
+  const selectedRoster = getSelectedRoster(side);
+  if (selectedRoster) return selectedRoster;
+
+  const competitionName = els.competitionName.value.trim();
+  const teamName = els[`${side}Team`].value.trim();
+  if (!teamName) return null;
+
+  return findRosterByTeam(competitionName, teamName);
+}
+
+
+function normalizeCompetitionName(name) {
+  return String(name || "").trim().replace(/\s+/g, "");
+}
+
+function hasRosterForCompetition(competitionName) {
+  const cleanCompetition = normalizeCompetitionName(competitionName);
+  if (!cleanCompetition) return true;
+  return readRosters().some((roster) => normalizeCompetitionName(roster.competitionName) === cleanCompetition);
+}
+
+function hideNewCompetitionPrompt() {
+  const prompt = els.competitionNewRosterPrompt;
+  if (!prompt) return;
+  prompt.classList.add("is-hidden");
+  prompt.innerHTML = "";
+}
+
+function createCompetitionRosterMarker(competitionName) {
+  const cleanCompetition = String(competitionName || "").trim();
+  if (!cleanCompetition) return null;
+  if (hasRosterForCompetition(cleanCompetition)) return null;
+  const marker = {
+    id: `${cleanCompetition}｜${COMPETITION_MARKER_TEAM}`,
+    kind: "competition-marker",
+    competitionName: cleanCompetition,
+    team: COMPETITION_MARKER_TEAM,
+    players: [],
+    updatedAt: new Date().toISOString(),
+  };
+  writeRosters([marker, ...readRosters()]);
+  return marker;
+}
+
+function showNewCompetitionPrompt(competitionName) {
+  const prompt = els.competitionNewRosterPrompt;
+  if (!prompt || !competitionName) return;
+  prompt.classList.remove("is-hidden");
+  prompt.innerHTML = "";
+
+  const message = document.createElement("span");
+  message.textContent = `偵測到「${competitionName}」尚未建立賽事檢錄，要先檢錄嗎？`;
+
+  const createButton = document.createElement("button");
+  createButton.type = "button";
+  createButton.textContent = "直接建立盃賽檢錄";
+  createButton.addEventListener("click", () => {
+    const marker = createCompetitionRosterMarker(competitionName);
+    hideNewCompetitionPrompt();
+    if (marker) {
+      flashStatus(`已建立「${competitionName}」的賽事檢錄，可繼續建立隊伍與選手`);
+    } else {
+      flashStatus(`「${competitionName}」已在賽事檢錄中`);
+    }
+    renderRosters();
+  });
+
+  const rosterButton = document.createElement("button");
+  rosterButton.type = "button";
+  rosterButton.textContent = "去賽事檢錄補隊伍";
+  rosterButton.addEventListener("click", () => {
+    els.rosterCompetition.value = competitionName;
+    hideNewCompetitionPrompt();
+    switchView("rosterView");
+    els.rosterTeam.focus();
+    flashStatus("請建立此盃賽的隊伍與選手名單");
+  });
+
+  const dismissButton = document.createElement("button");
+  dismissButton.type = "button";
+  dismissButton.className = "muted-action";
+  dismissButton.textContent = "先不要";
+  dismissButton.addEventListener("click", hideNewCompetitionPrompt);
+
+  prompt.append(message, createButton, rosterButton, dismissButton);
+}
+
+function checkUnknownCompetitionForRoster() {
+  const competitionName = els.competitionName.value.trim();
+  if (!competitionName || hasRosterForCompetition(competitionName)) {
+    hideNewCompetitionPrompt();
+    return;
+  }
+  showNewCompetitionPrompt(competitionName);
+}
+
+function hideNewTeamPrompt(side) {
+  const prompt = els[`${side}NewTeamPrompt`];
+  if (!prompt) return;
+  prompt.classList.add("is-hidden");
+  prompt.innerHTML = "";
+}
+
+function createEmptyRosterForSide(side) {
+  const team = els[`${side}Team`].value.trim();
+  if (!team) return null;
+  const competitionName = els.competitionName.value.trim() || "未命名盃賽";
+  const existing = findRosterByTeam(competitionName, team);
+  if (existing) return existing;
+  const roster = { id: `${competitionName}｜${team}`, competitionName, team, players: [], updatedAt: new Date().toISOString() };
+  writeRosters([roster, ...readRosters()]);
+  return roster;
+}
+
+function showNewTeamPrompt(side, teamName) {
+  const prompt = els[`${side}NewTeamPrompt`];
+  if (!prompt || !teamName) return;
+  prompt.classList.remove("is-hidden");
+  prompt.innerHTML = "";
+
+  const competitionName = els.competitionName.value.trim() || "未命名盃賽";
+  const message = document.createElement("span");
+  message.textContent = `偵測到「${teamName}」尚未在「${competitionName}」建立檢錄，要建立嗎？`;
+
+  const createButton = document.createElement("button");
+  createButton.type = "button";
+  createButton.textContent = "建立檢錄";
+  createButton.addEventListener("click", () => {
+    const roster = createEmptyRosterForSide(side);
+    hideNewTeamPrompt(side);
+    if (roster) {
+      const select = els[`${side}RosterSelect`];
+      if (select) select.value = roster.id;
+      renderRosterPlayerPicks(side);
+      flashStatus(`已建立 ${roster.team} 的檢錄名單，可再補選手`);
+    }
+  });
+
+  const editButton = document.createElement("button");
+  editButton.type = "button";
+  editButton.textContent = "去賽事檢錄填選手";
+  editButton.addEventListener("click", () => {
+    const roster = createEmptyRosterForSide(side);
+    if (roster) editRoster(roster.id);
+    els.rosterCompetition.value = competitionName;
+    els.rosterTeam.value = teamName;
+    hideNewTeamPrompt(side);
+    switchView("rosterView");
+    els.rosterPlayers.focus();
+  });
+
+  const dismissButton = document.createElement("button");
+  dismissButton.type = "button";
+  dismissButton.className = "muted-action";
+  dismissButton.textContent = "先不要";
+  dismissButton.addEventListener("click", () => hideNewTeamPrompt(side));
+
+  prompt.append(message, createButton, editButton, dismissButton);
+}
+
+function checkUnknownTeamForRoster(side) {
+  const teamName = els[`${side}Team`].value.trim();
+  if (!teamName) {
+    hideNewTeamPrompt(side);
+    return;
+  }
+  const competitionName = els.competitionName.value.trim();
+  const roster = findRosterByTeam(competitionName, teamName);
+  if (roster) {
+    hideNewTeamPrompt(side);
+    const select = els[`${side}RosterSelect`];
+    if (select && !select.value) {
+      select.value = roster.id;
+      renderRosterPlayerPicks(side);
+    }
+    return;
+  }
+  showNewTeamPrompt(side, teamName);
+}
+
+function hideNewPlayerPrompt(side) {
+  const prompt = els[`${side}NewPlayerPrompt`];
+  if (!prompt) return;
+  prompt.classList.add("is-hidden");
+  prompt.innerHTML = "";
+}
+
+function addPlayerToRoster(rosterId, playerName) {
+  const cleanName = String(playerName || "").trim();
+  if (!cleanName) return false;
+
+  let changed = false;
+  const rosters = readRosters().map((roster) => {
+    if (roster.id !== rosterId) return roster;
+    const players = Array.isArray(roster.players) ? [...roster.players] : [];
+    const exists = players.some((name) => normalizePersonName(name) === normalizePersonName(cleanName));
+    if (exists) return roster;
+    changed = true;
+    return { ...roster, players: [...players, cleanName], updatedAt: new Date().toISOString() };
+  });
+
+  if (changed) writeRosters(rosters);
+  return changed;
+}
+
+function showNewPlayerPrompt(side, roster, playerName) {
+  const prompt = els[`${side}NewPlayerPrompt`];
+  if (!prompt || !roster) return;
+  prompt.classList.remove("is-hidden");
+  prompt.innerHTML = "";
+
+  const message = document.createElement("span");
+  message.textContent = `偵測到「${playerName}」不在 ${roster.team} 的檢錄名單，要加入嗎？`;
+
+  const addButton = document.createElement("button");
+  addButton.type = "button";
+  addButton.textContent = `加入 ${roster.team}`;
+  addButton.addEventListener("click", () => {
+    const added = addPlayerToRoster(roster.id, playerName);
+    hideNewPlayerPrompt(side);
+    if (added) {
+      flashStatus(`已將 ${playerName} 加入 ${roster.team}`);
+    } else {
+      flashStatus(`${playerName} 已在 ${roster.team} 名單內`);
+    }
+  });
+
+  const editButton = document.createElement("button");
+  editButton.type = "button";
+  editButton.textContent = "去賽事檢錄編輯";
+  editButton.addEventListener("click", () => {
+    editRoster(roster.id);
+    switchView("rosterView");
+  });
+
+  const dismissButton = document.createElement("button");
+  dismissButton.type = "button";
+  dismissButton.className = "muted-action";
+  dismissButton.textContent = "先不要";
+  dismissButton.addEventListener("click", () => hideNewPlayerPrompt(side));
+
+  prompt.append(message, addButton, editButton, dismissButton);
+}
+
+function checkUnknownPlayerForRoster(side, input) {
+  const playerName = input.value.trim();
+  if (!playerName) {
+    hideNewPlayerPrompt(side);
+    return;
+  }
+
+  const roster = getRosterForSide(side);
+  if (!roster || !Array.isArray(roster.players) || !roster.players.length) {
+    hideNewPlayerPrompt(side);
+    return;
+  }
+
+  const exists = roster.players.some((name) => normalizePersonName(name) === normalizePersonName(playerName));
+  if (exists) {
+    hideNewPlayerPrompt(side);
+    return;
+  }
+
+  showNewPlayerPrompt(side, roster, playerName);
+}
+
+function checkUnknownPlayersForSide(side) {
+  const rows = [...els[`${side}Rows`].querySelectorAll("tr")];
+  const firstUnknownInput = rows
+    .map((row) => row.querySelector('[data-field="name"]'))
+    .find((input) => {
+      const roster = getRosterForSide(side);
+      const playerName = input.value.trim();
+      if (!roster || !playerName) return false;
+      return !(roster.players || []).some((name) => normalizePersonName(name) === normalizePersonName(playerName));
+    });
+  if (firstUnknownInput) checkUnknownPlayerForRoster(side, firstUnknownInput);
+}
+
+function renderRosterPlayerPicks(side) {
+  const container = els[`${side}RosterPlayers`];
+  if (!container) return;
+  const roster = getSelectedRoster(side);
+  container.innerHTML = "";
+
+  if (!roster || !roster.players?.length) {
+    container.textContent = "選擇隊伍後，這裡會出現該隊選手快捷按鈕。";
+    return;
+  }
+
+  const label = document.createElement("strong");
+  label.textContent = "隊內選手：";
+  container.append(label);
+
+  roster.players.forEach((playerName) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = playerName;
+    button.title = "點一下填入第一個空白選手欄；若已滿，會提醒你手動選擇要替換的位置。";
+    button.addEventListener("click", () => insertRosterPlayer(side, playerName));
+    container.append(button);
+  });
+}
+
+function renderRosterPlayerPickers() {
+  SIDES.forEach(renderRosterPlayerPicks);
+}
+
+function insertRosterPlayer(side, playerName) {
+  const rows = [...els[`${side}Rows`].querySelectorAll("tr")];
+  const nameInputs = rows.map((row) => row.querySelector('[data-field="name"]'));
+  const existing = nameInputs.find((input) => input.value.trim() === playerName);
+  if (existing) {
+    existing.focus();
+    existing.select();
+    flashStatus(`${playerName} 已在${SIDE_LABELS[side]}名單中`);
+    return;
+  }
+  const emptyInput = nameInputs.find((input) => !input.value.trim());
+  if (!emptyInput) {
+    flashStatus(`${SIDE_LABELS[side]}三格已滿，可手動點選要替換的選手欄位`);
+    return;
+  }
+  emptyInput.value = playerName;
+  calculate();
+  markDirty();
+  hideNewPlayerPrompt(side);
+  flashStatus(`已加入 ${playerName}`);
+}
+
+function editRoster(rosterId) {
+  const roster = readRosters().find((item) => item.id === rosterId);
+  if (!roster) return;
+  els.rosterCompetition.value = roster.competitionName;
+  els.rosterTeam.value = roster.team;
+  els.rosterPlayers.value = (roster.players || []).join("\n");
+  els.rosterTeam.focus();
+  flashStatus("已載入名單，可修改後按儲存／更新名單");
+}
+
+function renderRosters() {
+  const rosters = readRosters().filter((roster) => !isCompetitionMarker(roster));
+  const activeCompetition = els.competitionName.value.trim();
+  const options = rosters.filter((roster) => !activeCompetition || roster.competitionName === activeCompetition);
+  [els.affirmativeRosterSelect, els.negativeRosterSelect].forEach((select) => {
+    if (!select) return;
+    const previousValue = select.value;
+    select.innerHTML = "";
+    select.append(new Option(options.length ? "選擇隊伍" : "尚無名單", ""));
+    options.forEach((roster) => select.append(new Option(`${roster.competitionName}｜${roster.team}`, roster.id)));
+    if (options.some((roster) => roster.id === previousValue)) select.value = previousValue;
+  });
+  renderRosterPlayerPickers();
+
+  els.rosterList.innerHTML = "";
+  if (!rosters.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-records";
+    empty.textContent = "尚未建立選手名單。";
+    els.rosterList.append(empty);
+    return;
+  }
+
+  rosters.forEach((roster) => {
+    const item = document.createElement("article");
+    item.className = "roster-card";
+    item.innerHTML = `
+      <div>
+        <strong>${escapeHtml(roster.team)}</strong>
+        <p>${escapeHtml(roster.competitionName)}｜${escapeHtml((roster.players || []).length ? roster.players.join("、") : "尚未填選手")}</p>
+      </div>
+      <div class="roster-card-actions">
+        <button class="small-action" type="button" data-edit-roster="${escapeHtml(roster.id)}">編輯</button>
+        <button class="small-action" type="button" data-delete-roster="${escapeHtml(roster.id)}">刪除</button>
+      </div>
+    `;
+    item.querySelector("[data-edit-roster]").addEventListener("click", () => editRoster(roster.id));
+    item.querySelector("[data-delete-roster]").addEventListener("click", () => {
+      writeRosters(readRosters().filter((candidate) => candidate.id !== roster.id));
+      flashStatus("已刪除選手名單");
+    });
+    els.rosterList.append(item);
+  });
+}
+
+function loadRosterToSide(side) {
+  const roster = getSelectedRoster(side);
+  if (!roster) {
+    flashStatus("請先選擇隊伍名單");
+    return;
+  }
+  if (!confirmDiscardUnsaved(`帶入${SIDE_LABELS[side]}名單`)) return;
+  els.competitionName.value = roster.competitionName;
+  els[`${side}Team`].value = roster.team;
+  const rows = [...els[`${side}Rows`].querySelectorAll("tr")];
+  rows.forEach((row, index) => {
+    row.querySelector('[data-field="name"]').value = roster.players[index] || "";
+  });
+  calculate();
+  renderSeasonRankings();
+  renderRosters();
+  hideNewTeamPrompt(side);
+  hideNewPlayerPrompt(side);
+  markDirty();
+  flashStatus(`已帶入${SIDE_LABELS[side]}名單`);
+}
+function flashSaveButton() {
+  els.saveMatch.classList.add("is-saved");
+  window.clearTimeout(flashSaveButton.timer);
+  flashSaveButton.timer = window.setTimeout(() => els.saveMatch.classList.remove("is-saved"), 900);
+}
+
 function init() {
   createRows();
   setScoreTabOrder();
@@ -1778,18 +2360,46 @@ function init() {
       normalizeIntegerInput(input);
       normalizeScoreInput(input);
       calculate();
-      if (input === els.competitionName) renderSeasonRankings();
+      markDirty();
+      if (input === els.competitionName) {
+        renderSeasonRankings();
+        els.rosterCompetition.value = els.competitionName.value;
+        renderRosters();
+        if (!els.competitionName.value.trim()) hideNewCompetitionPrompt();
+      }
     });
   });
+  els.competitionName.addEventListener("blur", checkUnknownCompetitionForRoster);
+  els.competitionName.addEventListener("change", checkUnknownCompetitionForRoster);
   els.saveMatch.addEventListener("click", saveMatch);
+  els.saveRosterTeam.addEventListener("click", saveRosterTeam);
+  els.loadAffirmativeRoster.addEventListener("click", () => loadRosterToSide("affirmative"));
+  els.loadNegativeRoster.addEventListener("click", () => loadRosterToSide("negative"));
+  els.affirmativeRosterSelect.addEventListener("change", () => {
+    renderRosterPlayerPicks("affirmative");
+    checkUnknownPlayersForSide("affirmative");
+  });
+  els.negativeRosterSelect.addEventListener("change", () => {
+    renderRosterPlayerPicks("negative");
+    checkUnknownPlayersForSide("negative");
+  });
+  SIDES.forEach((side) => {
+    els[`${side}Team`].addEventListener("blur", () => checkUnknownTeamForRoster(side));
+    els[`${side}Team`].addEventListener("change", () => checkUnknownTeamForRoster(side));
+  });
+  els.recordCompetitionFilter.addEventListener("change", () => { recordFilters.competition = els.recordCompetitionFilter.value; renderRecords(); });
+  els.recordPeriodFilter.addEventListener("change", () => { recordFilters.period = els.recordPeriodFilter.value; renderRecords(); });
+  els.recordVenueFilter.addEventListener("change", () => { recordFilters.venue = els.recordVenueFilter.value; renderRecords(); });
+  els.clearRecordFilters.addEventListener("click", () => { recordFilters.competition = ""; recordFilters.period = ""; recordFilters.venue = ""; renderRecords(); });
   els.swapSides.addEventListener("click", swapSides);
   els.ballotPhotoInput.addEventListener("change", handleBallotPhotoChange);
   els.removeBallotPhoto.addEventListener("click", () => {
     setBallotPhoto(null);
+    markDirty();
     flashStatus("已移除評分單照片");
   });
   els.saveCloudEndpoint.addEventListener("click", saveCloudEndpoint);
-  els.resetForm.addEventListener("click", resetForm);
+  els.resetForm.addEventListener("click", () => { if (confirmDiscardUnsaved("清空輸入")) resetForm(); });
   els.exportRecords.addEventListener("click", exportRecords);
   els.exportSpreadsheet.addEventListener("click", exportSpreadsheet);
   els.showSpreadsheetText.addEventListener("click", showSpreadsheetText);
@@ -1814,6 +2424,9 @@ function init() {
     select.addEventListener("change", calculateCycle);
   });
   calculate();
+  els.rosterCompetition.value = els.competitionName.value;
+  renderRosters();
+  markClean();
   renderMatchSummaries();
   renderRecords();
   renderNameSuggestions();
