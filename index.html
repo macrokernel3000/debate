@@ -4,14 +4,31 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>辯論比賽計分紀錄</title>
-    <link rel="stylesheet" href="styles.css?v=20260609-01" />
+    <link rel="stylesheet" href="styles.css?v=20260609-04" />
   </head>
   <body>
+    <svg class="icon-sprite" aria-hidden="true" focusable="false">
+      <symbol id="icon-score" viewBox="0 0 24 24"><path d="M6 3h9l3 3v15H6z"/><path d="M14 3v4h4"/><path d="M9 11h6M9 15h6M9 19h4"/></symbol>
+      <symbol id="icon-roster" viewBox="0 0 24 24"><path d="M7 4h10v3H7z"/><path d="M6 6h12v15H6z"/><path d="M9 11h6M9 15h6M9 19h4"/></symbol>
+      <symbol id="icon-cycle" viewBox="0 0 24 24"><path d="M7 7a7 7 0 0 1 10-.5l1 1"/><path d="M18 3v5h-5"/><path d="M17 17a7 7 0 0 1-10 .5l-1-1"/><path d="M6 21v-5h5"/></symbol>
+      <symbol id="icon-chart" viewBox="0 0 24 24"><path d="M4 20h16"/><path d="M7 16v-5"/><path d="M12 16V7"/><path d="M17 16v-9"/></symbol>
+      <symbol id="icon-trophy" viewBox="0 0 24 24"><path d="M8 4h8v4a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4"/><path d="M16 6h3a3 3 0 0 1-3 4"/><path d="M12 12v5M9 20h6M10 17h4"/></symbol>
+      <symbol id="icon-judge" viewBox="0 0 24 24"><path d="M12 4v15"/><path d="M5 8h14"/><path d="M7 8l-3 6h6z"/><path d="M17 8l-3 6h6z"/></symbol>
+      <symbol id="icon-pen" viewBox="0 0 24 24"><path d="M4 20l4-1 10-10-3-3L5 16z"/><path d="M13 6l3 3"/></symbol>
+      <symbol id="icon-team" viewBox="0 0 24 24"><path d="M8 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M16 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M3 20a5 5 0 0 1 10 0"/><path d="M11 20a5 5 0 0 1 10 0"/></symbol>
+      <symbol id="icon-mic" viewBox="0 0 24 24"><rect x="9" y="4" width="6" height="10" rx="3"/><path d="M6 11a6 6 0 0 0 12 0"/><path d="M12 17v4M9 21h6"/></symbol>
+      <symbol id="icon-bulb" viewBox="0 0 24 24"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M8 10a4 4 0 1 1 8 0c0 2-2 3-2 5h-4c0-2-2-3-2-5z"/></symbol>
+      <symbol id="icon-photo" viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M6 17l4-4 3 3 2-2 3 3"/></symbol>
+      <symbol id="icon-save" viewBox="0 0 24 24"><path d="M5 4h12l2 2v14H5z"/><path d="M8 4v6h8V4"/><path d="M8 20v-6h8v6"/></symbol>
+      <symbol id="icon-record" viewBox="0 0 24 24"><path d="M5 5h14v14H5z"/><path d="M8 9h8M8 13h8M8 17h5"/></symbol>
+      <symbol id="icon-player" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5 21a7 7 0 0 1 14 0"/></symbol>
+    </svg>
+
     <main class="app">
       <header class="topbar">
         <div>
           <p class="eyebrow">小果仁思辨教育</p>
-          <h1>辯論賽計分紀錄</h1>
+          <h1><svg class="ui-icon"><use href="#icon-score"></use></svg>辯論賽計分紀錄</h1>
         </div>
         <div class="save-status">
           <strong id="saveStatus">資料儲存在此瀏覽器</strong>
@@ -20,10 +37,10 @@
       </header>
 
       <nav class="app-tabs" aria-label="功能切換">
-        <button class="tab-button is-active" type="button" data-view="scoreView">計分紀錄</button>
-        <button class="tab-button" type="button" data-view="rosterView">賽事檢錄</button>
-        <button class="tab-button" type="button" data-view="cycleView">循環計算器</button>
-        <button class="tab-button" type="button" data-view="playerView">統計數據</button>
+        <button class="tab-button is-active" type="button" data-view="scoreView"><svg class="ui-icon"><use href="#icon-score"></use></svg>計分紀錄</button>
+        <button class="tab-button" type="button" data-view="rosterView"><svg class="ui-icon"><use href="#icon-roster"></use></svg>賽事檢錄</button>
+        <button class="tab-button" type="button" data-view="cycleView"><svg class="ui-icon"><use href="#icon-cycle"></use></svg>循環計算器</button>
+        <button class="tab-button" type="button" data-view="playerView"><svg class="ui-icon"><use href="#icon-chart"></use></svg>統計數據</button>
         <label class="tab-import-action" title="匯入資料" aria-label="匯入資料">
           <span>匯入資料</span>
           <input id="importGlobalSpreadsheet" type="file" accept=".csv,text/csv" />
@@ -33,7 +50,7 @@
       <section id="scoreView" class="app-view">
       <section class="match-meta" aria-label="比賽資訊">
         <label>
-          盃賽名稱
+          <span class="label-icon"><svg class="ui-icon"><use href="#icon-trophy"></use></svg>盃賽名稱</span>
           <input id="competitionName" type="text" list="competitionNameOptions" placeholder="輸入或搜尋盃賽名稱" />
         </label>
         <div id="competitionNewRosterPrompt" class="new-player-prompt is-hidden" aria-live="polite"></div>
@@ -50,11 +67,11 @@
           <input id="matchDate" type="date" />
         </label>
         <label>
-          裁判
+          <span class="label-icon"><svg class="ui-icon"><use href="#icon-judge"></use></svg>裁判</span>
           <input id="matchJudge" type="text" list="judgeNameOptions" placeholder="裁判姓名" />
         </label>
         <label>
-          記錄員
+          <span class="label-icon"><svg class="ui-icon"><use href="#icon-pen"></use></svg>記錄員</span>
           <input id="matchRecorder" type="text" list="recorderNameOptions" placeholder="記錄員姓名" />
         </label>
       </section>
@@ -74,14 +91,14 @@
       <section class="teams" aria-label="選手分數">
         <article class="team-panel" data-side="affirmative">
           <div class="panel-heading">
-            <h2>正方</h2>
+            <h2><svg class="ui-icon"><use href="#icon-team"></use></svg>正方</h2>
             <input id="affirmativeTeam" type="text" list="teamNameOptions" placeholder="學校或隊伍名稱" />
             <label class="side-argument">
-              結辯
+              <span class="label-icon"><svg class="ui-icon"><use href="#icon-mic"></use></svg>結辯</span>
               <input id="affirmativeClosing" type="number" min="0" max="50" step="1" inputmode="numeric" />
             </label>
             <label class="side-argument">
-              論點分
+              <span class="label-icon"><svg class="ui-icon"><use href="#icon-bulb"></use></svg>論點</span>
               <input id="affirmativeArgument" type="number" min="0" max="20" step="1" inputmode="numeric" />
             </label>
           </div>
@@ -95,7 +112,6 @@
                 <col class="score-col" />
                 <col class="score-col" />
                 <col class="total-col" />
-                <col class="note-col" />
               </colgroup>
               <thead>
                 <tr>
@@ -104,7 +120,6 @@
                   <th>質詢</th>
                   <th>答辯</th>
                   <th>個人總分</th>
-                  <th>備註</th>
                 </tr>
               </thead>
               <tbody id="affirmativeRows"></tbody>
@@ -112,20 +127,16 @@
           </div>
         </article>
 
-        <div class="swap-panel">
-          <button id="swapSides" type="button">正反對調</button>
-        </div>
-
         <article class="team-panel" data-side="negative">
           <div class="panel-heading">
-            <h2>反方</h2>
+            <h2><svg class="ui-icon"><use href="#icon-team"></use></svg>反方</h2>
             <input id="negativeTeam" type="text" list="teamNameOptions" placeholder="學校或隊伍名稱" />
             <label class="side-argument">
-              結辯
+              <span class="label-icon"><svg class="ui-icon"><use href="#icon-mic"></use></svg>結辯</span>
               <input id="negativeClosing" type="number" min="0" max="50" step="1" inputmode="numeric" />
             </label>
             <label class="side-argument">
-              論點分
+              <span class="label-icon"><svg class="ui-icon"><use href="#icon-bulb"></use></svg>論點</span>
               <input id="negativeArgument" type="number" min="0" max="20" step="1" inputmode="numeric" />
             </label>
           </div>
@@ -139,7 +150,6 @@
                 <col class="score-col" />
                 <col class="score-col" />
                 <col class="total-col" />
-                <col class="note-col" />
               </colgroup>
               <thead>
                 <tr>
@@ -148,7 +158,6 @@
                   <th>質詢</th>
                   <th>答辯</th>
                   <th>個人總分</th>
-                  <th>備註</th>
                 </tr>
               </thead>
               <tbody id="negativeRows"></tbody>
@@ -157,11 +166,8 @@
         </article>
       </section>
 
-      <section class="ballot-photo-panel" aria-label="評分單照片">
-        <div>
-          <p>評分單照片</p>
-          <strong id="ballotPhotoStatus">尚未附加照片</strong>
-        </div>
+      <section class="ballot-photo-panel" aria-label="評分單照片與正反對調">
+        <button id="swapSides" type="button">正反對調</button>
         <label class="photo-upload">
           <span>拍照或選擇圖片</span>
           <input id="ballotPhotoInput" type="file" accept="image/*" capture="environment" />
@@ -199,7 +205,7 @@
       </section>
 
       <section class="actions" aria-label="操作">
-        <button class="primary" id="saveMatch" type="button">儲存本場</button>
+        <button class="primary" id="saveMatch" type="button"><svg class="ui-icon"><use href="#icon-save"></use></svg>儲存本場</button>
         <button id="resetForm" type="button">清空輸入</button>
         <label class="import-action">
           匯入資料
@@ -213,7 +219,7 @@
 
       <section id="spreadsheetTextPanel" class="spreadsheet-text-panel is-hidden" aria-label="貼上用表格">
         <div class="section-heading">
-          <h2>貼上用表格</h2>
+          <h2><svg class="ui-icon"><use href="#icon-record"></use></svg>貼上用表格</h2>
           <button id="copySpreadsheetText" type="button">複製文字</button>
         </div>
         <textarea id="spreadsheetTextOutput" readonly spellcheck="false"></textarea>
@@ -221,7 +227,7 @@
 
       <section class="match-summary-section" aria-label="場次勝負統計">
         <div class="section-heading">
-          <h2>場次勝負統計</h2>
+          <h2><svg class="ui-icon"><use href="#icon-chart"></use></svg>場次勝負統計</h2>
           <p id="matchSummaryCount">0 場</p>
         </div>
         <div class="record-filters" aria-label="場次勝負統計篩選">
@@ -238,7 +244,7 @@
 
       <section class="records-section" aria-label="歷史紀錄">
         <div class="section-heading">
-          <h2>比賽紀錄</h2>
+          <h2><svg class="ui-icon"><use href="#icon-record"></use></svg>比賽紀錄</h2>
           <p id="recordCount">0 筆</p>
         </div>
         <div id="recordsList" class="records-list"></div>
@@ -248,12 +254,12 @@
       <section id="rosterView" class="app-view is-hidden" aria-label="賽事檢錄">
         <section class="roster-section roster-page" aria-label="檢錄賽事選手名單">
           <div class="section-heading">
-            <h2>賽事檢錄</h2>
+            <h2><svg class="ui-icon"><use href="#icon-roster"></use></svg>賽事檢錄</h2>
             <p>先建立盃賽、隊伍與選手。回到「計分紀錄」時，隊伍與選手欄位會自動提供搜尋與新增提醒。</p>
           </div>
           <div class="roster-editor">
             <label>
-              盃賽名稱
+              <span class="label-icon"><svg class="ui-icon"><use href="#icon-trophy"></use></svg>盃賽名稱</span>
               <input id="rosterCompetition" type="text" list="competitionNameOptions" placeholder="輸入或搜尋盃賽名稱" />
             </label>
             <label>
@@ -264,7 +270,7 @@
               選手名單（一行一位）
               <textarea id="rosterPlayers" placeholder="王小明&#10;陳小華&#10;林小安"></textarea>
             </label>
-            <button class="primary" id="saveRosterTeam" type="button">儲存／更新名單</button>
+            <button class="primary" id="saveRosterTeam" type="button"><svg class="ui-icon"><use href="#icon-save"></use></svg>儲存／更新名單</button>
             <button id="exportRosterData" type="button">匯出資料</button>
             <label class="import-action">
               匯入資料
@@ -279,20 +285,19 @@
       <section id="cycleView" class="app-view is-hidden" aria-label="循環計算器">
         <section class="cycle-panel">
           <div class="section-heading">
-            <h2>循環計算器</h2>
+            <h2><svg class="ui-icon"><use href="#icon-cycle"></use></svg>循環計算器</h2>
             <p id="cycleStatus">選擇已儲存的場次</p>
           </div>
           <div class="cycle-controls">
             <label>
               循環類型
               <select id="cycleType">
-                <option value="single">單淘</option>
                 <option value="mutual">互咬</option>
                 <option value="triangle">三角循環</option>
               </select>
             </label>
             <label>
-              盃賽名稱
+              <span class="label-icon"><svg class="ui-icon"><use href="#icon-trophy"></use></svg>盃賽名稱</span>
               <select id="cycleCompetition"></select>
             </label>
             <label>
@@ -377,16 +382,16 @@
       <section id="playerView" class="app-view is-hidden" aria-label="統計數據">
         <section class="player-growth-panel">
           <div class="section-heading">
-            <h2>統計數據</h2>
+            <h2><svg class="ui-icon"><use href="#icon-chart"></use></svg>統計數據</h2>
             <p>選擇選手後，查看他在某個盃賽或所有盃賽中的分數曲線與勝率變化。</p>
           </div>
 
           <div class="player-entry-grid single">
             <article class="player-card">
-              <h3>選手統計</h3>
+              <h3><svg class="ui-icon"><use href="#icon-player"></use></svg>選手統計</h3>
               <div class="player-form-grid">
                 <label>隊伍／學校<input id="playerGrowthTeam" type="text" list="playerGrowthTeamOptions" placeholder="先選隊伍或學校" /></label>
-                <label>選手姓名<input id="playerGrowthName" type="text" list="playerGrowthPlayerOptions" placeholder="再選擇或輸入姓名" /></label>
+                <label>選手姓名<select id="playerGrowthName"></select></label>
                 <label>觀察項目
                   <select id="playerGrowthMetric">
                     <option value="totalAverage">總分平均</option>
@@ -411,20 +416,20 @@
 
           <div class="growth-chart-card">
             <div class="section-heading compact-heading">
-              <h2>數據曲線</h2>
+              <h2><svg class="ui-icon"><use href="#icon-chart"></use></svg>數據曲線</h2>
               <p id="playerChartCaption">請先選擇選手。</p>
             </div>
             <div id="playerTrendChart" class="trend-chart" aria-label="分數曲線圖"></div>
           </div>
 
           <div class="player-analysis-card">
-            <h3>系統提醒</h3>
+            <h3><svg class="ui-icon"><use href="#icon-bulb"></use></svg>系統提醒</h3>
             <p id="playerInsightText">選擇選手後，系統會用計分紀錄中的資料整理平均分數與勝率趨勢。</p>
           </div>
 
           <div class="player-table-card">
             <div class="section-heading compact-heading">
-              <h2>我的場次紀錄</h2>
+              <h2><svg class="ui-icon"><use href="#icon-record"></use></svg>我的場次紀錄</h2>
               <p id="playerRecordCount">0 筆</p>
             </div>
             <div id="playerRecordsTable" class="player-records-table"></div>
@@ -432,7 +437,7 @@
 
           <div class="player-rank-card">
             <div class="section-heading compact-heading">
-              <h2>盃賽排行榜</h2>
+              <h2><svg class="ui-icon"><use href="#icon-trophy"></use></svg>盃賽排行榜</h2>
               <p>依指定盃賽與門檻統計名次分與單項表現。</p>
             </div>
             <div class="player-form-grid compact">
@@ -456,19 +461,19 @@
             </div>
             <div class="rank-section-grid">
               <article>
-                <h3>名次加總前五</h3>
+                <h3><svg class="ui-icon"><use href="#icon-trophy"></use></svg>名次加總前五</h3>
                 <div id="rankSumLeaders" class="ranking-table"></div>
               </article>
               <article>
-                <h3>申論王</h3>
+                <h3><svg class="ui-icon"><use href="#icon-mic"></use></svg>申論王</h3>
                 <div id="speechLeaders" class="ranking-table"></div>
               </article>
               <article>
-                <h3>質詢王</h3>
+                <h3><svg class="ui-icon"><use href="#icon-mic"></use></svg>質詢王</h3>
                 <div id="questionLeaders" class="ranking-table"></div>
               </article>
               <article>
-                <h3>答辯王</h3>
+                <h3><svg class="ui-icon"><use href="#icon-mic"></use></svg>答辯王</h3>
                 <div id="defenseLeaders" class="ranking-table"></div>
               </article>
             </div>
@@ -484,7 +489,6 @@
         <td><input data-field="question" type="number" min="-10" max="100" step="1" inputmode="numeric" /></td>
         <td><input data-field="defense" type="number" min="-10" max="100" step="1" inputmode="numeric" /></td>
         <td><output data-field="total">0</output></td>
-        <td><input data-field="note" type="text" placeholder="備註" /></td>
       </tr>
     </template>
 
@@ -495,9 +499,8 @@
     <datalist id="negativePlayerNameOptions"></datalist>
     <datalist id="playerNameOptions"></datalist>
     <datalist id="playerGrowthTeamOptions"></datalist>
-    <datalist id="playerGrowthPlayerOptions"></datalist>
     <datalist id="teamNameOptions"></datalist>
 
-    <script src="app.js?v=20260609-01"></script>
+    <script src="app.js?v=20260609-04"></script>
   </body>
 </html>

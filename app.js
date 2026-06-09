@@ -117,7 +117,6 @@ const els = {
   playerGrowthMetric: document.querySelector("#playerGrowthMetric"),
   playerGrowthCompetition: document.querySelector("#playerGrowthCompetition"),
   playerGrowthTeamOptions: document.querySelector("#playerGrowthTeamOptions"),
-  playerGrowthPlayerOptions: document.querySelector("#playerGrowthPlayerOptions"),
   renderPlayerGrowth: document.querySelector("#renderPlayerGrowth"),
   rankingCompetition: document.querySelector("#rankingCompetition"),
   rankingMinAppearances: document.querySelector("#rankingMinAppearances"),
@@ -684,7 +683,8 @@ function loadRecordToForm(id) {
       row.querySelector('[data-field="speech"]').value = formatInputNumber(player.speech);
       row.querySelector('[data-field="question"]').value = formatInputNumber(player.question);
       row.querySelector('[data-field="defense"]').value = formatInputNumber(player.defense);
-      row.querySelector('[data-field="note"]').value = player.note || "";
+      const noteInput = row.querySelector('[data-field="note"]');
+      if (noteInput) noteInput.value = player.note || "";
     });
   });
 
@@ -1787,12 +1787,19 @@ function renderTrendChart(entries, metric) {
     const y = height - padding - ((value - min) / range) * (height - padding * 2);
     return `<circle cx="${x}" cy="${y}" r="4"><title>${entries[index].competitionName}｜${entries[index].matchLabel}｜${formatNumber(value)}${metric === "winRate" ? "%" : ""}</title></circle>`;
   }).join("");
+  const pointLabels = values.map((value, index) => {
+    const x = entries.length === 1 ? width / 2 : padding + (index * (width - padding * 2)) / (entries.length - 1);
+    const y = height - padding - ((value - min) / range) * (height - padding * 2);
+    const safeY = Math.max(18, y - 10);
+    return `<text x="${x}" y="${safeY}" class="chart-point-label">${formatNumber(value)}${metric === "winRate" ? "%" : ""}</text>`;
+  }).join("");
   els.playerTrendChart.innerHTML = `
     <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${getMetricLabel(metric)}趨勢圖">
       <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" class="chart-axis" />
       <line x1="${padding}" y1="${padding}" x2="${padding}" y2="${height - padding}" class="chart-axis" />
       <polyline points="${points}" class="trend-line" />
       ${circles}
+      ${pointLabels}
       <text x="${padding}" y="24" class="chart-label">最高 ${formatNumber(max)}${metric === "winRate" ? "%" : ""}</text>
       <text x="${padding}" y="${height - 8}" class="chart-label">最低 ${formatNumber(min)}${metric === "winRate" ? "%" : ""}</text>
     </svg>
@@ -1842,7 +1849,14 @@ function getPlayerGrowthPlayerOptions(entries = getAllPlayerGrowthEntries()) {
 
 function renderPlayerGrowthSuggestions(entries = getAllPlayerGrowthEntries()) {
   if (els.playerGrowthTeamOptions) fillDatalist(els.playerGrowthTeamOptions, getPlayerGrowthTeamOptions(entries));
-  if (els.playerGrowthPlayerOptions) fillDatalist(els.playerGrowthPlayerOptions, getPlayerGrowthPlayerOptions(entries));
+  if (!els.playerGrowthName) return;
+  const current = els.playerGrowthName.value;
+  const players = [...getPlayerGrowthPlayerOptions(entries)].sort((a, b) => a.localeCompare(b, "zh-Hant"));
+  els.playerGrowthName.innerHTML = "";
+  const hasTeam = Boolean((els.playerGrowthTeam?.value || "").trim());
+  els.playerGrowthName.append(new Option(hasTeam ? "選擇選手" : "請先選隊伍／學校", ""));
+  players.forEach((player) => els.playerGrowthName.append(new Option(player, player)));
+  els.playerGrowthName.value = players.includes(current) ? current : "";
 }
 
 function renderPlayerGrowthOptions() {
@@ -2592,7 +2606,7 @@ async function handleBallotPhotoChange() {
     return;
   }
 
-  els.ballotPhotoStatus.textContent = "照片處理中";
+  if (els.ballotPhotoStatus) els.ballotPhotoStatus.textContent = "照片處理中";
   els.removeBallotPhoto.disabled = true;
 
   try {
@@ -2641,13 +2655,13 @@ function setBallotPhoto(photo) {
   els.removeBallotPhoto.disabled = !photo;
 
   if (!photo?.dataUrl) {
-    els.ballotPhotoStatus.textContent = "尚未附加照片";
+    if (els.ballotPhotoStatus) els.ballotPhotoStatus.textContent = "尚未附加照片";
     els.ballotPhotoPreview.classList.add("is-empty");
     els.ballotPhotoPreview.innerHTML = "<span>照片預覽</span>";
     return;
   }
 
-  els.ballotPhotoStatus.textContent = photo.name || "已附加照片";
+  if (els.ballotPhotoStatus) els.ballotPhotoStatus.textContent = photo.name || "已附加照片";
   els.ballotPhotoPreview.classList.remove("is-empty");
   els.ballotPhotoPreview.innerHTML = `<img src="${escapeHtml(photo.dataUrl)}" alt="評分單照片預覽" />`;
 }

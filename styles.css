@@ -69,6 +69,14 @@ button.danger {
   cursor: pointer;
 }
 
+label.import-action,
+.import-action {
+  border-color: #c8d8ca;
+  color: var(--green);
+  background: var(--green-soft);
+  font-weight: 900;
+}
+
 .import-action input {
   display: none;
 }
@@ -211,10 +219,11 @@ input:focus {
 
 .ballot-photo-panel {
   display: grid;
-  grid-template-columns: minmax(180px, 240px) minmax(220px, 1fr) auto minmax(180px, 260px);
+  grid-template-columns: auto minmax(180px, 260px) auto minmax(160px, 240px);
   align-items: center;
-  gap: 12px;
-  padding: 16px;
+  column-gap: 18px;
+  row-gap: 10px;
+  padding: 12px 16px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.78);
@@ -236,6 +245,8 @@ input:focus {
 .photo-upload {
   display: grid;
   gap: 6px;
+  border-left: 1px solid #dbe4ee;
+  padding-left: 18px;
   color: var(--muted);
   font-size: 13px;
   font-weight: 800;
@@ -252,6 +263,10 @@ input:focus {
   color: var(--muted);
   background: #f8fafc;
   font-size: 13px;
+}
+
+.photo-preview.is-empty {
+  display: none;
 }
 
 .photo-preview img {
@@ -514,6 +529,8 @@ label.import-action {
 
 .teams {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
   gap: 16px;
 }
 
@@ -525,13 +542,7 @@ label.import-action {
   box-shadow: var(--shadow);
 }
 
-.swap-panel {
-  display: flex;
-  justify-content: center;
-  margin: -4px 0;
-}
-
-.swap-panel button {
+.ballot-photo-panel #swapSides {
   border-color: #b8c6d6;
   color: var(--blue);
   font-weight: 800;
@@ -540,11 +551,11 @@ label.import-action {
 
 .panel-heading {
   display: grid;
-  grid-template-columns: 120px minmax(260px, 1fr) 150px 150px;
+  grid-template-columns: auto minmax(140px, 1fr) minmax(66px, 0.42fr) minmax(66px, 0.42fr);
   align-items: center;
   justify-content: start;
-  gap: 12px;
-  padding: 16px;
+  gap: 8px;
+  padding: 12px;
   border-bottom: 1px solid var(--line);
   background: var(--band);
 }
@@ -558,6 +569,11 @@ label.import-action {
   font-size: 20px;
 }
 
+.panel-heading h2 {
+  margin: 0;
+  white-space: nowrap;
+}
+
 .table-wrap {
   overflow-x: auto;
 }
@@ -569,26 +585,26 @@ table {
   min-width: 860px;
 }
 
+.team-panel table {
+  min-width: 0;
+}
+
 .player-col {
-  width: 28%;
+  width: 32%;
 }
 
 .score-col {
-  width: 9%;
+  width: 15%;
 }
 
 .total-col {
-  width: 10%;
-}
-
-.note-col {
-  width: 35%;
+  width: 23%;
 }
 
 th,
 td {
   border-bottom: 1px solid var(--line);
-  padding: 10px;
+  padding: 8px;
   text-align: left;
   vertical-align: middle;
 }
@@ -606,8 +622,8 @@ th:nth-child(n + 2):nth-child(-n + 5) {
 
 td output {
   display: inline-grid;
-  width: 64px;
-  min-height: 36px;
+  width: 56px;
+  min-height: 34px;
   align-items: center;
   justify-content: center;
   border-radius: 7px;
@@ -619,7 +635,7 @@ td output {
 td input[data-field="speech"],
 td input[data-field="question"],
 td input[data-field="defense"] {
-  max-width: 86px;
+  max-width: 66px;
   margin-left: auto;
 }
 
@@ -873,6 +889,7 @@ td input[data-field="defense"] {
   .cycle-rank-controls,
   .scoreboard,
   .best-panel,
+  .teams,
   .match-summary,
   .summary-votes,
   .record-result {
@@ -933,7 +950,7 @@ td input[data-field="defense"] {
 }
 
 .roster-editor {
-  grid-template-columns: 1fr 1fr minmax(260px, 1.2fr) auto;
+  grid-template-columns: minmax(160px, 1fr) minmax(160px, 1fr) minmax(240px, 1.2fr) auto auto auto;
   align-items: end;
 }
 
@@ -1002,6 +1019,16 @@ td input[data-field="defense"] {
   display: flex;
   justify-content: flex-end;
   padding: 0 16px 16px;
+}
+
+@media (max-width: 1120px) {
+  .roster-editor {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .roster-players-field {
+    grid-column: 1 / -1;
+  }
 }
 
 button.is-saved {
@@ -1266,6 +1293,17 @@ button.is-saved {
   font-weight: 700;
 }
 
+.chart-point-label {
+  fill: var(--ink);
+  font-size: 12px;
+  font-weight: 900;
+  text-anchor: middle;
+  paint-order: stroke;
+  stroke: #fff;
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
 .player-records-table {
   overflow-x: auto;
 }
@@ -1337,4 +1375,78 @@ button.is-saved {
   .rank-section-grid {
     grid-template-columns: 1fr;
   }
+}
+
+
+/* Formal inline icon system */
+.icon-sprite {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+.ui-icon {
+  width: 1.05em;
+  height: 1.05em;
+  display: inline-block;
+  vertical-align: -0.16em;
+  margin-right: 0.38em;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: 0 0 auto;
+}
+.tab-button,
+button,
+h1, h2, h3,
+.label-icon {
+  display: inline-flex;
+  align-items: center;
+}
+.label-icon .ui-icon {
+  opacity: 0.72;
+}
+button .ui-icon,
+.tab-button .ui-icon {
+  width: 1em;
+  height: 1em;
+  margin-right: 0.32em;
+}
+.card-title .ui-icon,
+h1 .ui-icon, h2 .ui-icon, h3 .ui-icon {
+  opacity: 0.82;
+}
+
+/* Safer, cleaner formal icon treatment */
+.topbar h1,
+.panel-heading h2,
+.card-title,
+.app-tabs .tab-button,
+.actions button,
+label .label-icon {
+  gap: 0.28rem;
+}
+
+label .label-icon {
+  color: var(--muted);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+label .label-icon .ui-icon {
+  width: 1rem;
+  height: 1rem;
+  opacity: 0.7;
+}
+
+.panel-heading h2 .ui-icon,
+.app-tabs .tab-button .ui-icon,
+.topbar h1 .ui-icon {
+  transform: translateY(-0.5px);
+}
+
+input::placeholder, textarea::placeholder {
+  color: #9aa6b2;
 }
